@@ -1,10 +1,29 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
+function _init()
+	x,y=60,60
+	spd=2
+end
+
 function _update()
+	--⬆️⬇️⬅️➡️
+	dx,dy=0,0
+	--btn input
+	if btn(⬅️) then dx=-spd end
+	if btn(➡️) then dx=spd end
+	if btn(⬆️) then dy=-spd end
+	if btn(⬇️) then dy=spd end
+	--move player
+	x+=dx
+	y+=dy
+	x=mid(0,x,120)
+	y=mid(0,y,120)
 end
 
 function _draw()
+	cls(0)
+	spr(1,x,y)
 end
 __gfx__
 00000000000220000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
