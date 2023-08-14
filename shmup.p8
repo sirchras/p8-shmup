@@ -12,6 +12,11 @@ function _init()
 	score=0
 	health=1
 	lives=3
+	--background
+	stars={}
+	for i=1,100 do
+		stars[i]={flr(rnd(128)),flr(rnd(128))}
+	end
 end
 
 function _update()
@@ -44,6 +49,8 @@ end
 
 function _draw()
 	cls(0)
+	--background
+	bgrnd()
 	--player
 	spr(p_s,x,y)
 	spr(f_s,x,y+8)
@@ -56,6 +63,15 @@ function _draw()
 	for i=1,lives do
 		heart=health>=i and 11 or 12
 		spr(heart,(i-1)*8,1)
+	end
+end
+
+--starfield
+function bgrnd()
+	--do stuff
+	for i=1,#stars do
+		local x,y=unpack(stars[i])
+		pset(x,y,7)
 	end
 end
 __gfx__
