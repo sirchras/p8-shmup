@@ -13,10 +13,7 @@ function _init()
 	health=1
 	lives=3
 	--background
-	stars={}
-	for i=1,100 do
-		stars[i]={flr(rnd(128)),flr(rnd(128))}
-	end
+	bg_update,bg_draw=bgrnd()
 end
 
 function _update()
@@ -45,12 +42,14 @@ function _update()
 	--anim flame
 	f_s+=1
 	if f_s>9 then f_s=5 end
+	--anim background
+	bg_update()
 end
 
 function _draw()
 	cls(0)
 	--background
-	bgrnd()
+	bg_draw()
 	--player
 	spr(p_s,x,y)
 	spr(f_s,x,y+8)
@@ -68,11 +67,33 @@ end
 
 --starfield
 function bgrnd()
-	--do stuff
-	for i=1,#stars do
-		local x,y=unpack(stars[i])
-		pset(x,y,7)
+	local _update,_draw
+	--init
+	local stars={}
+	for i=1,100 do
+		stars[i]={
+			flr(rnd(128)), --x
+			flr(rnd(128)), --y
+			1+flr(rnd(3)) --spd
+		}
 	end
+	_update=function()
+		for i=1,#stars do
+			local y,v=unpack(stars[i],2)
+			y=(y+v)%128
+			stars[i][2]=y
+		end
+	end
+	_draw=function()
+		for i=1,#stars do
+			local x,y,v=unpack(stars[i])
+			local c=7
+			if v==1 then c=1 end
+			if v==2 then c=13 end
+			pset(x,y,c)
+		end
+	end
+	return _update,_draw
 end
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000000000000880880008808800088008800880088000000000
