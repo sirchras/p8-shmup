@@ -25,6 +25,7 @@ function _draw()
 	draw[state]()
 	--debug time
 	print(flr(time()),0,120,7)
+	if (bullets) print(#bullets,0,112,8)
 end
 -->8
 --start state
@@ -49,7 +50,7 @@ function init_game()
 	f_s=5
 	x,y=60,60
 	spd=2
-	b={}
+	bullets={}
 	m_flsh=0
 	score=0
 	health=1
@@ -72,14 +73,23 @@ function update_game()
 	if btn(⬆️) then dy=-spd end
 	if btn(⬇️) then dy=spd end
 	if btnp(❎) then
-		b_x,b_y,m_flsh=x,y-6,3
+		--spawn new bullet
+		b=bullet:new({x=x,y=y-6,dy=-2})
+		add(bullets,b)
+		m_flsh=4
 		sfx(0)
 	end
 	--move player
 	x=mid(0,x+dx,120)
 	y=mid(0,y+dy,120)
-	--move projectile
-	if b_y then b_y-=1 end
+	--move bullets
+	for i=#bullets,1,-1 do
+		local b=bullets[i]
+		b:update()
+		if b.y>128 or b.y<-8 then
+			deli(bullets,i)
+		end
+	end
 	if m_flsh>0 then m_flsh-=1 end
 	--anim flame
 	f_s+=1
@@ -95,7 +105,10 @@ function draw_game()
 	--player
 	spr(p_s,x,y)
 	spr(f_s,x,y+8)
-	if b_y then spr(36,b_x,b_y) end
+	--bullets
+	for _,b in ipairs(bullets) do
+		b:draw()
+	end
 	if m_flsh>0 then
 		circfill(x+4,y,m_flsh,7)
 	end
@@ -105,6 +118,22 @@ function draw_game()
 		heart=health>=i and 11 or 12
 		spr(heart,(i-1)*8,1)
 	end
+end
+
+--bullet class
+bullet={x=0,y=0,sp=36,dx=0,dy=0}
+function bullet:new(o)
+	o=o or {}
+	setmetatable(o,self)
+	self.__index=self
+	return o
+end
+function bullet:update()
+	self.x+=self.dx
+	self.y+=self.dy
+end
+function bullet:draw()
+	spr(self.sp,self.x,self.y)
 end
 
 --starfield
