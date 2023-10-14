@@ -23,7 +23,6 @@ function _draw()
 		over=draw_over
 	}
 	draw[state]()
-	player:draw()
 	--debug time
 	print(flr(time()),0,120,7)
 	if (bullets) print(#bullets,0,112,8)
@@ -49,12 +48,7 @@ end
 function init_game()
 	score=0
 	--player
-	p_s=2
-	f_s=5
-	x,y=60,60
-	spd=2
-	health=1
-	lives=3
+	p=player:new{x=60,y=60,♥=1}
 	--bullets
 	bullets={}
 	m_flsh=0
@@ -63,36 +57,19 @@ function init_game()
 	add(enemies,enemy:new{x=40,y=40})
 	add(enemies,enemy:new{x=80,y=20})
 	--background
-	bg_update,bg_draw=bgrnd()
+	bg=bgrnd()
 end
 
 function update_game()
-	--⬆️⬇️⬅️➡️
-	p_s=2
-	dx,dy=0,0
-	--btn input
-	if btn(⬅️) then
-		dx,p_s=-spd,1
-	end
-	if btn(➡️) then
-		dx,p_s=spd,3
-	end
-	if btn(⬆️) then dy=-spd end
-	if btn(⬇️) then dy=spd end
-	if btnp(❎) then
-		--spawn new bullet
-		b=bullet:new{x=x,y=y-6,dy=-2}
-		add(bullets,b)
-		m_flsh=4
-		sfx(0)
-	end
+	--test, remove later
+	if btnp(🅾️) then state="over" end
 	--move player
-	x=mid(0,x+dx,120)
-	y=mid(0,y+dy,120)
+	p:update()
 	--move bullets
 	for i=#bullets,1,-1 do
 		local b=bullets[i]
 		b:update()
+		--rm offscreen bullets
 		if b.y>128 or b.y<-8 then
 			deli(bullets,i)
 		end
@@ -100,24 +77,19 @@ function update_game()
 	--move enemies
 	for e in all(enemies) do
 		e:update()
+		--rm offscreen enemies
 		if (e.y>128) del(enemies,e)
 	end
-	--anim firing effect
-	if m_flsh>0 then m_flsh-=1 end
-	--anim flame
-	f_s+=1
-	if f_s>9 then f_s=5 end
 	--anim background
-	bg_update()
+	bg.update()
 end
 
 function draw_game()
 	cls(0)
 	--background
-	bg_draw()
+	bg.draw()
 	--player
-	spr(p_s,x,y)
-	spr(f_s,x,y+8)
+	p:draw()
 	--enemies
 	for _,e in ipairs(enemies) do
 		e:draw()
@@ -126,19 +98,20 @@ function draw_game()
 	for _,b in ipairs(bullets) do
 		b:draw()
 	end
-	if m_flsh>0 then
-		circfill(x+4,y,m_flsh,7)
-	end
 	--ui
 	print("score: "..score,40,0,12)
-	for i=1,lives do
-		heart=health>=i and 11 or 12
-		spr(heart,(i-1)*8,1)
+	for i=1,p.m♥ do
+		sp=p.♥>=i and 11 or 12
+		spr(sp,(i-1)*8,1)
 	end
 end
 
 --base game obj class
-gmobj={x=0,y=0,sp=0}
+gmobj={
+	x=0, --x
+	y=0, --y
+	sp=0 --sprite
+}
 function gmobj:new(o)
 	o=o or {}
 	setmetatable(o,self)
@@ -150,25 +123,74 @@ function gmobj:draw()
 end
 
 --player class
-player=gmobj:new{sp=2,fsp=5}
+player=gmobj:new{
+	sp=2, --player sprite
+	fsp=5, --flame sprite
+	s=2, --movement speed
+	mflsh=0, --muzzle flash
+	♥=3, --current lives
+	m♥=3 --max lives
+}
 function player:draw()
+	local x,y=self.x,self.y
 	--call parent draw
 	gmobj.draw(self)
 	--flame spr
-	spr(self.fsp,self.x,self.y+8)
+	spr(self.fsp,x,y+8)
+	--muzzle flash
+	if self.mflsh>0 then
+		circfill(x+4,y,self.mflsh,7)
+	end
 end
 function player:update()
+	local sp=2 --default sprite
+	local x,y=self.x,self.y
+	local dx,dy=0,0
+	--btn input
+	--⬆️⬇️⬅️➡️❎
+	if btn(⬅️) then
+		dx,sp=-self.s,1
+	end
+	if btn(➡️) then
+		dx,sp=self.s,3
+	end
+	if btn(⬆️) then dy=-self.s end
+	if btn(⬇️) then dy=self.s end
+	if btnp(❎) then
+		--spawn new bullet
+		b=bullet:new{x=x,y=y-6,dy=-2}
+		add(bullets,b)
+		--set muzzle flash
+		self.mflsh=4
+		--play firing sfx
+		sfx(0)
+	end
+	--move/update player
+	self.x=mid(0,x+dx,120)
+	self.y=mid(0,y+dy,120)
+	self.sp=sp
+	--anim firing effect
+	if (self.mflsh>0) self.mflsh-=1
+	--anim flame
+	self.fsp+=1
+	if (self.fsp>9)	self.fsp=5
 end
 
 --bullet class
-bullet=gmobj:new{sp=35,dx=0,dy=0}
+bullet=gmobj:new{
+	sp=35, --bullet sprite
+	dx=0, --x velocity
+	dy=0 --y velocity
+}
 function bullet:update()
 	self.x+=self.dx
 	self.y+=self.dy
 end
 
 --enemy class
-enemy=gmobj:new{sp=37}
+enemy=gmobj:new{
+	sp=37 --enemy sprite
+}
 function enemy:update()
 	self.y+=1
 	--anim
@@ -188,14 +210,14 @@ function bgrnd()
 			1+flr(rnd(3)) --spd
 		}
 	end
-	_update=function()
+	_upd=function()
 		for i=1,#stars do
 			local y,v=unpack(stars[i],2)
 			y=(y+v)%128
 			stars[i][2]=y
 		end
 	end
-	_draw=function()
+	_drw=function()
 		for i=1,#stars do
 			local x,y,v=unpack(stars[i])
 			local c=7
@@ -204,7 +226,7 @@ function bgrnd()
 			pset(x,y,c)
 		end
 	end
-	return _update,_draw
+	return {update=_upd,draw=_drw}
 end
 -->8
 --over state
