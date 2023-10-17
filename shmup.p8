@@ -4,14 +4,15 @@ __lua__
 --main
 function _init()
 	--state
-	state="start"
+	state="debug"
 end
 
 function _update()
 	local update={
 		start=update_start,
 		game=update_game,
-		over=update_over
+		over=update_over,
+		debug=update_start
 	}
 	update[state]()
 end
@@ -20,13 +21,27 @@ function _draw()
 	local draw={
 		start=draw_start,
 		game=draw_game,
-		over=draw_over
+		over=draw_over,
+		debug=draw_debug
 	}
 	draw[state]()
 	--debug time
-	print(flr(time()),0,120,7)
-	if (bullets) print(#bullets,0,112,8)
-	if (enemies) print(#enemies,0,104,11)
+	if not state=="debug" then
+		print(flr(time()),0,120,7)
+		if (p) print(p.invul,0,104,9)
+		if (p) print(sin(p.invul/3),0,112,5)
+--		if (bullets) print(#bullets,0,112,8)
+--		if (enemies) print(#enemies,0,104,11)
+	end
+end
+
+function draw_debug()
+	cls()
+	local q=12
+	for i=0,30 do
+		print((i/q).." "..sin(i/q))
+		if (i/q>=1) break
+	end
 end
 -->8
 --start state
@@ -48,14 +63,13 @@ end
 function init_game()
 	score=0
 	--player
-	p=player:new{x=60,y=60,♥=1}
+	p=player:new{x=60,y=60}
 	--bullets
 	bullets={}
 	m_flsh=0
 	--enemies
 	enemies={}
-	add(enemies,enemy:new{x=40,y=40})
-	add(enemies,enemy:new{x=80,y=20})
+	spawnenemies(2)
 	--background
 	bg=bgrnd()
 end
@@ -85,6 +99,10 @@ function update_game()
 	--check if game over
 	if p.♥<=0 then
 		state="over"
+	end
+	--spawn enemy
+	if #enemies<2 then
+		spawnenemies(2)
 	end
 end
 
@@ -150,12 +168,20 @@ player=gmobj:new{
 	s=2, --movement speed
 	mflsh=0, --muzzle flash
 	♥=3, --current lives
-	m♥=3 --max lives
+	m♥=3, --max lives
+	invul=0 --iframes
 }
 function player:draw()
 	local x,y=self.x,self.y
-	--call parent draw
-	gmobj.draw(self)
+	--blinking invulerability
+	local ifr=self.invul
+	local blink=(
+		ifr>0 and sin(ifr/12)<-0.5
+	)
+	if not blink then
+		--call parent draw
+		gmobj.draw(self)
+	end
 	--flame spr
 	spr(self.fsp,x,y+8)
 	--muzzle flash
@@ -190,6 +216,8 @@ function player:update()
 	self.x=mid(0,x+dx,120)
 	self.y=mid(0,y+dy,120)
 	self.sp=sp
+	--decrm iframes
+	if (self.invul>0) self.invul-=1
 	--anim muzzle flash
 	if (self.mflsh>0) self.mflsh-=1
 	--anim flame
@@ -212,7 +240,9 @@ function bullet:update()
 			--todo: enemy bullets
 			deli(enemies,i)
 			del(bullets,self)
+			sfx(2)
 			score+=100
+			spawnenemy()
 		end
 	end
 end
@@ -224,16 +254,27 @@ enemy=gmobj:new{
 function enemy:update()
 	self.y+=1
 	--check enemy/player collision
-	if self:col(p) then
+	if self:col(p) and p.invul==0 then
 		sfx(1)
 		--todo: this seems a little dodgy
 		p.♥-=1
-		del(enemies,self)
+		p.invul=60
 	end
 	--anim
 	self.sp+=0.4
 	if (self.sp>=41) self.sp=37
 end
+
+function spawnenemies(n)
+	for i=1,n do
+		local e=enemy:new{
+			x=rnd(120), --random x pos
+			y=-8 --offscreen (above)
+		}
+		add(enemies,e)
+	end
+end
+spawnenemy=function() spawnenemies(1) end
 
 --starfield
 function bgrnd()
@@ -316,3 +357,4 @@ __gfx__
 __sfx__
 0001000034050310502d05027050220501d05019050130500f0500c0500b050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0001000000000296502b6502c6402c6402c6302963027630236201e62016620106100c61009610086000760006600076000560005600000000000000000000000000000000000000000000000000000000000000
+00010000326500e6502965031640156400c6300763005620036200364000620006000060000620006200060000650006000065000600006500060001650006000060000600006000060000600006000060000600
