@@ -4,7 +4,7 @@ __lua__
 --main
 function _init()
 	--state
-	state="debug"
+	state="start"
 end
 
 function _update()
@@ -171,24 +171,6 @@ player=gmobj:new{
 	m♥=3, --max lives
 	invul=0 --iframes
 }
-function player:draw()
-	local x,y=self.x,self.y
-	--blinking invulerability
-	local ifr=self.invul
-	local blink=(
-		ifr>0 and sin(ifr/12)<-0.5
-	)
-	if not blink then
-		--call parent draw
-		gmobj.draw(self)
-	end
-	--flame spr
-	spr(self.fsp,x,y+8)
-	--muzzle flash
-	if self.mflsh>0 then
-		circfill(x+4,y,self.mflsh,7)
-	end
-end
 function player:update()
 	local sp=2 --default sprite
 	local x,y=self.x,self.y
@@ -223,6 +205,24 @@ function player:update()
 	--anim flame
 	self.fsp+=1
 	if (self.fsp>9)	self.fsp=5
+end
+function player:draw()
+	local x,y=self.x,self.y
+	--blinking invulerability
+	local ifr=self.invul
+	local blink=(
+		ifr>0 and sin(ifr/12)<0
+	)
+	if not blink then
+		--call parent draw
+		gmobj.draw(self)
+	end
+	--flame spr
+	spr(self.fsp,x,y+8)
+	--muzzle flash
+	if self.mflsh>0 then
+		circfill(x+4,y,self.mflsh,7)
+	end
 end
 
 --bullet class
