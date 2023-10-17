@@ -26,13 +26,9 @@ function _draw()
 	}
 	draw[state]()
 	--debug time
-	if not state=="debug" then
-		print(flr(time()),0,120,7)
-		if (p) print(p.invul,0,104,9)
-		if (p) print(sin(p.invul/3),0,112,5)
---		if (bullets) print(#bullets,0,112,8)
---		if (enemies) print(#enemies,0,104,11)
-	end
+	print(flr(time()),0,120,7)
+	if (bullets) print(#bullets,0,112,8)
+	if (enemies) print(#enemies,0,104,11)
 end
 
 function draw_debug()
@@ -92,17 +88,16 @@ function update_game()
 	for e in all(enemies) do
 		e:update()
 		--rm offscreen enemies
-		if (e.y>128) del(enemies,e)
+		if e.y>128 then
+			del(enemies,e)
+			spawnenemy()
+		end
 	end
 	--anim background
 	bg.update()
 	--check if game over
 	if p.♥<=0 then
 		state="over"
-	end
-	--spawn enemy
-	if #enemies<2 then
-		spawnenemies(2)
 	end
 end
 
@@ -166,6 +161,8 @@ player=gmobj:new{
 	sp=2, --player sprite
 	fsp=5, --flame sprite
 	s=2, --movement speed
+	fr=4, --fire rate
+	fc=0, --fire cooldown
 	mflsh=0, --muzzle flash
 	♥=3, --current lives
 	m♥=3, --max lives
@@ -185,12 +182,14 @@ function player:update()
 	end
 	if btn(⬆️) then dy=-self.s end
 	if btn(⬇️) then dy=self.s end
-	if btnp(❎) then
+	if btn(❎) and self.fc<=0 then
 		--spawn new bullet
 		b=bullet:new{x=x,y=y-6,dy=-2}
 		add(bullets,b)
+		--reset fire cooldown
+		self.fc=self.fr
 		--set muzzle flash
-		self.mflsh=4
+		self.mflsh=5
 		--play firing sfx
 		sfx(0)
 	end
@@ -200,6 +199,8 @@ function player:update()
 	self.sp=sp
 	--decrm iframes
 	if (self.invul>0) self.invul-=1
+	--decrm fire cooldown
+	self.fc-=1
 	--anim muzzle flash
 	if (self.mflsh>0) self.mflsh-=1
 	--anim flame
@@ -227,7 +228,7 @@ end
 
 --bullet class
 bullet=gmobj:new{
-	sp=35, --bullet sprite
+	sp=33, --bullet sprite
 	dx=0, --x velocity
 	dy=0 --y velocity
 }
@@ -241,7 +242,7 @@ function bullet:update()
 			deli(enemies,i)
 			del(bullets,self)
 			sfx(2)
-			score+=100
+			score+=10
 			spawnenemy()
 		end
 	end
