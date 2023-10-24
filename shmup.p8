@@ -33,11 +33,10 @@ end
 
 function draw_debug()
 	cls()
-	local x,d=30,12
-	for i=0,x do
-		local q=i/d
-		print((q).." "..sin(q))
-		if (q>=1) break
+	local sp,d=38,10
+	for t=d,1,-0.5 do
+		local s=sp+(2*flr((10-t)/2))
+		print(t.." "..s)
 	end
 end
 -->8
@@ -277,18 +276,22 @@ end
 
 --explosion fx class
 ex=gmobj:new{
-	sp=44, --explosion sprite
+	sp=38, --explosion sprite
 	spx=2, --ex sprite width
 	spy=2, --ex sprite height
 	t=10 --ex duration, frames
 }
 function ex:update()
+	local t=self.t
+	--update current sprite
+	self.sp=38+(2*(flr((10-t)/2)))
 	--dcrm ex duration
-	self.t-=1
+	t-=0.5
 	--if duration expired, delete
-	if self.t<=0 then
+	if t<=0 then
 		del(effects,self)
 	end
+	self.t=t
 end
 
 --enemy class
