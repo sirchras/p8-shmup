@@ -29,6 +29,7 @@ function _draw()
 	print(flr(time()),0,120,7)
 	if (bullets) print(#bullets,0,112,8)
 	if (enemies) print(#enemies,0,104,11)
+	if (pfx) print(#pfx,0,96,9)
 end
 
 function draw_debug()
@@ -67,14 +68,15 @@ function init_game()
 	enemies={}
 	spawnenemies(2)
 	--fx
-	effects={}
+--	effects={} --sprite effects
+	pfx={} --particles
 	--background
 	bg=bgrnd()
 end
 
 function update_game()
 	--test, remove later
-	if btnp(🅾️) then state="over" end
+	if (btnp(🅾️)) state="over"
 	--move player
 	p:update()
 	--move bullets
@@ -96,8 +98,8 @@ function update_game()
 		end
 	end
 	--anim fx
-	for fx in all(effects) do
-		fx:update()
+	for ptc in all(pfx) do
+		ptc:update()
 	end
 	--anim background
 	bg.update()
@@ -125,6 +127,9 @@ function draw_game()
 	for _,fx in ipairs(effects) do
 		fx:draw()
 	end
+	for _,ptc in ipairs(pfx) do
+		ptc:draw()
+	end
 	--ui
 	print("score: "..score,40,0,12)
 	for i=1,p.m♥ do
@@ -133,20 +138,25 @@ function draw_game()
 	end
 end
 
+-- classes --
+--
+--util class to avoid repetition
+class={}
+function class:new(o)
+	o=o or {}
+	setmetatable(o,self)
+	self.__index=self
+	return o
+end
+
 --base game obj class
-gmobj={
+gmobj=class:new{
 	x=0, --x
 	y=0, --y
 	sp=0, --sprite
 	spx=1, --sprite width
 	spy=1 --sprite height
 }
-function gmobj:new(o)
-	o=o or {}
-	setmetatable(o,self)
-	self.__index=self
-	return o
-end
 function gmobj:draw()
 	spr(self.sp,self.x,self.y,
 		self.spx,self.spy)
@@ -258,10 +268,7 @@ function bullet:update()
 			del(bullets,self)
 			if e.♥<=0 then
 				--create explosion fx
-				add(effects,ex:new{
-					x=e.x-4,
-					y=e.y-4
-				})
+				spawnexplosion(e.x+4,e.y+4)
 				--delete the dead enemy
 				deli(enemies,i)
 				--score,sfx feedback
@@ -272,26 +279,6 @@ function bullet:update()
 			end
 		end
 	end
-end
-
---explosion fx class
-ex=gmobj:new{
-	sp=38, --explosion sprite
-	spx=2, --ex sprite width
-	spy=2, --ex sprite height
-	t=10 --ex duration, frames
-}
-function ex:update()
-	local t=self.t
-	--update current sprite
-	self.sp=38+(2*(flr((10-t)/2)))
-	--dcrm ex duration
-	t-=0.5
-	--if duration expired, delete
-	if t<=0 then
-		del(effects,self)
-	end
-	self.t=t
 end
 
 --enemy class
@@ -350,6 +337,46 @@ function enemy:draw()
 	pal() --reset palette
 end
 
+--(explosion) particle class
+ptc=class:new{
+	x=0, --x
+	y=0, --y
+	r=2, --ptc radius
+	dx=0, --x velocity
+	dy=0, --y velocity
+	t=0, --ptc age
+	mt=30, --ptc max age
+}
+function ptc:update()
+	--update position
+	self.x+=self.dx
+	self.y+=self.dy
+	--deccelerate ptc
+	self.dx*=0.85
+	self.dy*=0.85
+	--update ptc age
+	self.t+=1
+	--if ptc too old, shrink/fade
+	if self.t>self.mt then
+		self.r-=0.5
+		if (self.r<0) del(pfx,self)
+	end
+end
+function ptc:draw()
+	local c,age=7,self.t/self.mt
+	--change color based on ptc age
+	if (age>0.2) c=10
+	if (age>0.3) c=9
+	if (age>0.5) c=8
+	if (age>0.6) c=2
+	if (age>0.8) c=5
+	circfill(self.x,self.y,
+		self.r,c)
+end
+
+-- helper functions --
+--
+--spawn enemy
 function spawnenemies(n)
 	for i=1,n do
 		local e=enemy:new{
@@ -361,9 +388,25 @@ function spawnenemies(n)
 end
 spawnenemy=function() spawnenemies(1) end
 
-function spawnfx(effect,x,y)
-	local fx=effect:new{x=x,y=y}
-	add(effects,fx)
+--spawn explosion pfx
+function spawnexplosion(x,y)
+	--central flash ptc
+	add(pfx,ptc:new{
+		x=x,
+		y=y,
+		r=8,
+		mt=0
+	})
+	for i=1,30 do
+		add(pfx,ptc:new{
+			x=x,
+			y=y,
+			r=1+rnd(4), -- 1<=r<5
+			dx=rnd(6)-3, -- -3<=dx<3
+			dy=rnd(6)-3, -- -3<=dy<3
+			mt=10+rnd(10) -- 10<=mt<20
+		})
+	end
 end
 
 --starfield
