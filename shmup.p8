@@ -124,9 +124,6 @@ function draw_game()
 		b:draw()
 	end
 	--fx
-	for _,fx in ipairs(effects) do
-		fx:draw()
-	end
 	for _,ptc in ipairs(pfx) do
 		ptc:draw()
 	end
