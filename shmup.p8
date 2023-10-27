@@ -253,12 +253,14 @@ function bullet:update()
 			--todo: enemy bullets
 			e.♥-=1
 			e.flash=4
-			spawnimpact(self.x+4,self.y+4)
+			spawnimpact(self.x+4,
+				self.y+4)
 			sfx(3)
 			del(bullets,self)
 			if e.♥<=0 then
 				--create explosion fx
-				spawnexplosion(e.x+4,e.y+4,"blue")
+				spawnexplosion(e.x+4,e.y+4,
+					"green")
 				--delete the dead enemy
 				deli(enemies,i)
 				--score,sfx feedback
@@ -280,7 +282,8 @@ enemy=gmobj:new{
 function enemy:update()
 	self.y+=1
 	--check enemy/player collision
-	if self:col(p) and p.invul==0 then
+	if self:col(p) and
+	   p.invul==0 then
 		--spawn explosion fx,sfx
 		spawnexplosion(p.x+4,p.y+4)
 		sfx(1)
@@ -381,7 +384,9 @@ expl=sprk:new{
 do
 	local lt={
 		red={10,9,8,2,5},
-		blue={13,12,1,2,5}
+		blue={13,12,1,2,5},
+		green={13,11,3,2,5},
+		purple={14,13,14,2,5},
 	}
 	function expl:draw()
 		local ct=lt[self.explc]
@@ -429,7 +434,9 @@ function spawnenemies(n)
 		add(enemies,e)
 	end
 end
-spawnenemy=function() spawnenemies(1) end
+spawnenemy=function()
+	spawnenemies(1)
+end
 
 --spawn explosion pfx
 function spawnexplosion(x,y,c)
