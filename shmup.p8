@@ -51,6 +51,7 @@ end
 --game state
 function init_game()
 	score=0
+	wave=1
 	--player
 	p=player:new{x=60,y=60}
 	--bullets
@@ -406,18 +407,18 @@ function expl:expire()
 	if (self.r<0) del(pfx,self)
 end
 
---wave ptc
-wave=ptc:new{
+--shockwave ptc
+skwv=ptc:new{
 	c=6, --default color
 	dr=1, --change in radius
 }
-function wave:update()
+function skwv:update()
 	--incr/dcrm radius
 	self.r+=self.dr
 	--call parent update
 	ptc.update(self)
 end
-function wave:draw()
+function skwv:draw()
 	circ(self.x,self.y,
 		self.r,self.c)
 end
@@ -462,7 +463,7 @@ function spawnexplosion(x,y,c)
 		})
 	end
 	--shockwave
-	add(pfx,wave:new{
+	add(pfx,skwv:new{
 		x=x,
 		y=y,
 		r=9,
@@ -483,7 +484,7 @@ end
 
 function spawnimpact(x,y)
 	--shockwave
-	add(pfx,wave:new{
+	add(pfx,skwv:new{
 		x=x,
 		y=y,
 		r=3,
