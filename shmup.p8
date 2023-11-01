@@ -3,8 +3,8 @@ version 41
 __lua__
 --main
 function _init()
-	--state
-	state="start"
+	startscrn()
+--	setbtnpdelay()
 end
 
 function _update()
@@ -30,26 +30,47 @@ function _draw()
 	if (bullets) print(#bullets,0,112,8)
 	if (enemies) print(#enemies,0,104,11)
 	if (pfx) print(#pfx,0,96,9)
+	print(peek(0x5f5c),0,88,12)
 end
 
+--update init btnp delay to val
+-- or disables if none provided
+function setbtnpdelay(delay)
+	local delay=delay or 255
+	poke(0x5f5c,delay)
+end
 -->8
 --start state
+function startscrn()
+	--set state, play music
+	state="start"
+	music(1)
+end
+
 function update_start()
 	if btnp(❎) then
 		--start game
-		init_game()
-		state="game"
+		startgame()
 	end
 end
 
 function draw_start()
 	cls(1)
-	print("shmup game v0.2",34,40,12)
+	print("shmup game v0.5",34,40,12)
 	print("press ❎ to start",30,80,7)
 end
+
 -->8
 --game state
-function init_game()
+function startgame()
+	--state
+	state="game"
+	--set init btnp delay equal
+	-- to rep delay
+	setbtnpdelay(4)
+	--fade music
+	music(-1,2000)
+	--set score,wave
 	score=0
 	wave=1
 	--player
@@ -98,7 +119,7 @@ function update_game()
 	bg.update()
 	--check if game over
 	if p.♥<=0 then
-		state="over"
+		gameover()
 	end
 end
 
@@ -195,7 +216,8 @@ function player:update()
 	end
 	if btn(⬆️) then dy=-self.s end
 	if btn(⬇️) then dy=self.s end
-	if btn(❎) and self.fc<=0 then
+--	if btn(❎) and self.fc<=0 then
+	if btnp(❎) then
 		--spawn new bullet
 		b=bullet:new{x=x,y=y-6,dy=-2}
 		add(bullets,b)
@@ -213,7 +235,7 @@ function player:update()
 	--decrm iframes
 	if (self.invul>0) self.invul-=1
 	--decrm fire cooldown
-	self.fc-=1
+	if (self.fc>0) self.fc-=1
 	--anim muzzle flash
 	if (self.mflsh>0) self.mflsh-=1
 	--anim flame
@@ -535,11 +557,18 @@ function bgrnd()
 end
 -->8
 --over state
+function gameover()
+	--set state, play music
+	state="over"
+	music(6)
+	setbtnpdelay()
+end
+
 function update_over()
 	if btnp(❎) then
 		--start game
-		init_game()
-		state="game"
+--		startgame()
+		startscrn()
 	end
 end
 
@@ -548,6 +577,7 @@ function draw_over()
 	print("game over",48,40,1)
 	print("press ❎ to restart",30,80,6+ceil(sin(time())))
 end
+
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
 0000000000288200002882000028820000000000000aa000000aa000000aa00000a77a00000aa00088880080888888808008008009aaaa900099990000000000
@@ -606,8 +636,8 @@ __sfx__
 001000000a5030000000000000000a5030a50000000000000a5030000009500000000a5030000000000075000a5030000000000000000a5030000000000000000a5030000000000000000a503000000000000000
 __music__
 04 04050644
-00 07084749
-04 090a484a
+01 07084749
+02 090a484a
 04 0b0c0d44
 00 0e084344
 04 0f0a4344
