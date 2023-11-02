@@ -2,48 +2,92 @@ pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
 --main
-function _init()
-	startscrn()
---	setbtnpdelay()
-end
+do
+	--state transition vars
+	local state,target_state
+	local tt=0 --time til trans
+	--true if state transition
+	isstatetrans=function()
+		return not not target_state
+	end
 
-function _update()
-	local update={
-		start=update_start,
-		game=update_game,
-		over=update_over,
-		debug=update_start
-	}
-	update[state]()
-end
+	function _init()
+		--load start screen
+		startscrn()
+--		setbtnpdelay()
+	end
 
-function _draw()
-	local draw={
-		start=draw_start,
-		game=draw_game,
-		over=draw_over,
-		debug=draw_debug
-	}
-	draw[state]()
-	--debug time
-	print(flr(time()),0,120,7)
-	if (bullets) print(#bullets,0,112,8)
-	if (enemies) print(#enemies,0,104,11)
-	if (pfx) print(#pfx,0,96,9)
-	print(peek(0x5f5c),0,88,12)
+	function _update()
+		local update={
+			start=update_start,
+			game=update_game,
+			over=update_over
+		}
+		--transition states
+		if target_state then
+			tt-=1
+			if tt<=0 then
+				--set state to target state
+				state,target_state=target_state,nil
+			end
+		end
+		update[state]()
+	end
+
+	function _draw()
+		local draw={
+			start=draw_start,
+			game=draw_game,
+			over=draw_over,
+		}
+		draw[state]()
+		--debug layout
+--		line(0,0,0,127,5)
+--		line(64,0,64,127,5)
+--		line(127,0,127,127,5)
+		--debug time
+		print(flr(time()),0,120,7)
+		--debug game objs and fx
+		if (bullets) print(#bullets,0,112,8)
+		if (enemies) print(#enemies,0,104,11)
+		if (pfx) print(#pfx,0,96,9)
+		--debug state/transitions
+		print(state,0,80,12)
+		print(target_state,0,88,12)
+		if (target_state) print(tt,20,88,12)
+		--debug music playing
+		print(stat(57),30,120,13)
+	end
+
+	function setstate(target,delay)
+		--block if state is trans
+		if (target_state) return
+		local delay=delay or 0
+		--if no delay,set state
+		if delay==0 then
+			state=target
+			return
+		end
+		tt=delay
+		target_state=target
+	end
 end
 
 --update init btnp delay to val
 -- or disables if none provided
 function setbtnpdelay(delay)
+	--default init btnp delay: 15
+	--default rep btnp delay: 4
 	local delay=delay or 255
 	poke(0x5f5c,delay)
 end
+
+
 -->8
 --start state
 function startscrn()
 	--set state, play music
-	state="start"
+	setstate("start")
 	music(1)
 end
 
@@ -64,9 +108,8 @@ end
 --game state
 function startgame()
 	--state
-	state="game"
-	--set init btnp delay equal
-	-- to rep delay
+	setstate("game")
+	--set init btnp delay
 	setbtnpdelay(4)
 	--fade music
 	music(-1,2000)
@@ -90,9 +133,9 @@ end
 
 function update_game()
 	--test, remove later
-	if (btnp(🅾️)) state="over"
+	if (btnp(🅾️)) setstate("over")
 	--move player
-	p:update()
+	if (p.♥>0) p:update()
 	--move bullets
 	for i=#bullets,1,-1 do
 		local b=bullets[i]
@@ -118,7 +161,8 @@ function update_game()
 	--anim background
 	bg.update()
 	--check if game over
-	if p.♥<=0 then
+	if p.♥<=0 and
+	   not isstatetrans() then
 		gameover()
 	end
 end
@@ -128,7 +172,7 @@ function draw_game()
 	--background
 	bg.draw()
 	--player
-	p:draw()
+	if (p.♥>0) p:draw()
 	--enemies
 	for _,e in ipairs(enemies) do
 		e:draw()
@@ -244,7 +288,7 @@ function player:update()
 end
 function player:draw()
 	local x,y=self.x,self.y
-	--blinking invulerability
+	--blinking
 	local ifr=self.invul
 	local blink=(
 		ifr>0 and sin(ifr/12)<0
@@ -559,12 +603,17 @@ end
 --over state
 function gameover()
 	--set state, play music
-	state="over"
+	setstate("over",30)
+--	setstate("over")
 	music(6)
 	setbtnpdelay()
 end
 
 function update_over()
+	--anim any remaining ptc
+	for ptc in all(pfx) do
+		ptc:update()
+	end
 	if btnp(❎) then
 		--start game
 --		startgame()
@@ -573,8 +622,8 @@ function update_over()
 end
 
 function draw_over()
-	cls(8)
-	print("game over",48,40,1)
+	draw_game() --draw game in bg
+	print("game over",47,40,8)
 	print("press ❎ to restart",30,80,6+ceil(sin(time())))
 end
 
