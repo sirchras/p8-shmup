@@ -81,8 +81,6 @@ function setbtnpdelay(delay)
 	local delay=delay or 255
 	poke(0x5f5c,delay)
 end
-
-
 -->8
 --start state
 function startscrn()
@@ -103,7 +101,6 @@ function draw_start()
 	print("shmup game v0.5",34,40,12)
 	print("press ❎ to start",30,80,7)
 end
-
 -->8
 --game state
 function startgame()
@@ -193,8 +190,145 @@ function draw_game()
 	end
 end
 
--- classes --
---
+--spawn enemy
+function spawnenemies(n)
+	for i=1,n do
+		local e=enemy:new{
+			x=rnd(120), --random x pos
+			y=-8 --offscreen (above)
+		}
+		add(enemies,e)
+	end
+end
+spawnenemy=function()
+	spawnenemies(1)
+end
+
+--spawn explosion pfx
+function spawnexplosion(x,y,c)
+	local c=c or "red"
+	--central flash ptc
+	add(pfx,expl:new{
+		x=x,
+		y=y,
+		r=8,
+		mt=0,
+		explc=c
+	})
+	--emanating ptc
+	for i=1,30 do
+		add(pfx,expl:new{
+			x=x,
+			y=y,
+			r=1+rnd(4), -- 1<=r<5
+			dx=rnd(6)-3, -- -3<=dx<3
+			dy=rnd(6)-3, -- -3<=dy<3
+			mt=10+rnd(10), -- 10<=mt<20
+			explc=c
+		})
+	end
+	--shockwave
+	add(pfx,skwv:new{
+		x=x,
+		y=y,
+		r=9,
+		dr=2,
+		mt=6,
+	})
+	--sparks
+	for i=1,20 do
+		add(pfx,sprk:new{
+			x=x,
+			y=y,
+			dx=rnd(10)-5, -- -5<=dx<5
+			dy=rnd(10)-5, -- -5<=dy<5
+			mt=10+rnd(10), -- 10<=mt<20
+		})
+	end
+end
+
+--spawn bullet impact pfx
+function spawnimpact(x,y)
+	--shockwave
+	add(pfx,skwv:new{
+		x=x,
+		y=y,
+		r=3,
+		mt=3,
+	})
+	--sparks
+	for i=1,ceil(rnd(2)) do
+		add(pfx,sprk:new{
+			x=x,
+			y=y,
+			r=flr(rnd(2)), -- r=0,1
+			dx=rnd(10)-5, -- -5<=dx<5
+			dy=rnd(5)-5, -- -5<=dy<0
+			mt=10+rnd(10), -- 10<=mt<20
+		})
+	end
+end
+
+--starfield
+function bgrnd()
+	local _upd,_drw
+	--init
+	local stars={}
+	for i=1,100 do
+		stars[i]={
+			flr(rnd(128)), --x
+			flr(rnd(128)), --y
+			1+flr(rnd(3)) --spd
+		}
+	end
+	_upd=function()
+		for i=1,#stars do
+			local y,v=unpack(stars[i],2)
+			y=(y+v)%128
+			stars[i][2]=y
+		end
+	end
+	_drw=function()
+		for i=1,#stars do
+			local x,y,v=unpack(stars[i])
+			local c=7
+			if v==1 then c=1 end
+			if v==2 then c=13 end
+			pset(x,y,c)
+		end
+	end
+	return {update=_upd,draw=_drw}
+end
+-->8
+--over state
+function gameover()
+	--set state, play music
+	setstate("over",30)
+--	setstate("over")
+	music(6)
+	setbtnpdelay()
+end
+
+function update_over()
+	--anim any remaining ptc
+	for ptc in all(pfx) do
+		ptc:update()
+	end
+	if btnp(❎) then
+		--start game
+--		startgame()
+		startscrn()
+	end
+end
+
+function draw_over()
+	draw_game() --draw game in bg
+	print("game over",47,40,8)
+	print("press ❎ to restart",30,80,6+ceil(sin(time())))
+end
+-->8
+--classes
+
 --util class to avoid repetition
 class={}
 function class:new(o)
@@ -488,145 +622,6 @@ function skwv:draw()
 	circ(self.x,self.y,
 		self.r,self.c)
 end
-
--- helper functions --
---
---spawn enemy
-function spawnenemies(n)
-	for i=1,n do
-		local e=enemy:new{
-			x=rnd(120), --random x pos
-			y=-8 --offscreen (above)
-		}
-		add(enemies,e)
-	end
-end
-spawnenemy=function()
-	spawnenemies(1)
-end
-
---spawn explosion pfx
-function spawnexplosion(x,y,c)
-	local c=c or "red"
-	--central flash ptc
-	add(pfx,expl:new{
-		x=x,
-		y=y,
-		r=8,
-		mt=0,
-		explc=c
-	})
-	--emanating ptc
-	for i=1,30 do
-		add(pfx,expl:new{
-			x=x,
-			y=y,
-			r=1+rnd(4), -- 1<=r<5
-			dx=rnd(6)-3, -- -3<=dx<3
-			dy=rnd(6)-3, -- -3<=dy<3
-			mt=10+rnd(10), -- 10<=mt<20
-			explc=c
-		})
-	end
-	--shockwave
-	add(pfx,skwv:new{
-		x=x,
-		y=y,
-		r=9,
-		dr=2,
-		mt=6,
-	})
-	--sparks
-	for i=1,20 do
-		add(pfx,sprk:new{
-			x=x,
-			y=y,
-			dx=rnd(10)-5, -- -5<=dx<5
-			dy=rnd(10)-5, -- -5<=dy<5
-			mt=10+rnd(10), -- 10<=mt<20
-		})
-	end
-end
-
-function spawnimpact(x,y)
-	--shockwave
-	add(pfx,skwv:new{
-		x=x,
-		y=y,
-		r=3,
-		mt=3,
-	})
-	--sparks
-	for i=1,ceil(rnd(2)) do
-		add(pfx,sprk:new{
-			x=x,
-			y=y,
-			r=flr(rnd(2)), -- r=0,1
-			dx=rnd(10)-5, -- -5<=dx<5
-			dy=rnd(5)-5, -- -5<=dy<0
-			mt=10+rnd(10), -- 10<=mt<20
-		})
-	end
-end
-
---starfield
-function bgrnd()
-	local _upd,_drw
-	--init
-	local stars={}
-	for i=1,100 do
-		stars[i]={
-			flr(rnd(128)), --x
-			flr(rnd(128)), --y
-			1+flr(rnd(3)) --spd
-		}
-	end
-	_upd=function()
-		for i=1,#stars do
-			local y,v=unpack(stars[i],2)
-			y=(y+v)%128
-			stars[i][2]=y
-		end
-	end
-	_drw=function()
-		for i=1,#stars do
-			local x,y,v=unpack(stars[i])
-			local c=7
-			if v==1 then c=1 end
-			if v==2 then c=13 end
-			pset(x,y,c)
-		end
-	end
-	return {update=_upd,draw=_drw}
-end
--->8
---over state
-function gameover()
-	--set state, play music
-	setstate("over",30)
---	setstate("over")
-	music(6)
-	setbtnpdelay()
-end
-
-function update_over()
-	--anim any remaining ptc
-	for ptc in all(pfx) do
-		ptc:update()
-	end
-	if btnp(❎) then
-		--start game
---		startgame()
-		startscrn()
-	end
-end
-
-function draw_over()
-	draw_game() --draw game in bg
-	print("game over",47,40,8)
-	print("press ❎ to restart",30,80,6+ceil(sin(time())))
-end
-
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
 0000000000288200002882000028820000000000000aa000000aa000000aa00000a77a00000aa00088880080888888808008008009aaaa900099990000000000
