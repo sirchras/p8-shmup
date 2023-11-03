@@ -41,22 +41,27 @@ do
 			over=draw_over,
 		}
 		draw[state]()
-		--debug layout
+		--debug layout/ui
 --		line(0,0,0,127,5)
 --		line(64,0,64,127,5)
 --		line(127,0,127,127,5)
+--		print("❎",0,0,2) --7x5 px
+--		print("ww",0,6,2) --7x5 px
+--		print("♥",0,12,2) --7x5 px
 		--debug time
 		print(flr(time()),0,120,7)
 		--debug game objs and fx
 		if (bullets) print(#bullets,0,112,8)
 		if (enemies) print(#enemies,0,104,11)
 		if (pfx) print(#pfx,0,96,9)
+		--debug waves
+--		if (wvt) print(wvt,120,104,11)
 		--debug state/transitions
-		print(state,0,80,12)
-		print(target_state,0,88,12)
-		if (target_state) print(tt,20,88,12)
+--		print(state,0,80,12)
+--		print(target_state,0,88,12)
+--		if (target_state) print(tt,20,88,12)
 		--debug music playing
-		print(stat(57),30,120,13)
+--		print(stat(57),30,120,13)
 	end
 
 	function setstate(target,delay)
@@ -81,6 +86,16 @@ function setbtnpdelay(delay)
 	local delay=delay or 255
 	poke(0x5f5c,delay)
 end
+
+--return fn that alternates
+-- between two color values
+function blink(c1,c2)
+	local c1,c2=c1,c2
+	return function()
+		local n=ceil(sin(time()))
+		return n==1 and c1 or c2
+	end
+end
 -->8
 --start state
 function startscrn()
@@ -96,10 +111,15 @@ function update_start()
 	end
 end
 
-function draw_start()
-	cls(1)
-	print("shmup game v0.5",34,40,12)
-	print("press ❎ to start",30,80,7)
+do
+	local blnk=blink(6,7)
+	function draw_start()
+		cls(1)
+		print("shmup game v0.5",34,40,
+			12)
+		print("press ❎ to start",30,
+			80,blnk())
+	end
 end
 -->8
 --game state
@@ -113,6 +133,7 @@ function startgame()
 	--set score,wave
 	score=0
 	wave=1
+	wvt=60 --wave timer
 	--player
 	p=player:new{x=60,y=60}
 	--bullets
@@ -120,7 +141,7 @@ function startgame()
 	m_flsh=0
 	--enemies
 	enemies={}
-	spawnenemies(2)
+--	spawnenemies(2)
 	--fx
 --	effects={} --sprite effects
 	pfx={} --particles
@@ -129,8 +150,19 @@ function startgame()
 end
 
 function update_game()
+	--spawn new wave
+	if wvt>0 then
+		wvt-=1
+		if (wvt==0) spawnwave()
+	end
+	--check if wave defeated
+	if #enemies==0 and wvt==0 then
+		wave+=1
+		--check if defeated all waves?
+		wvt=60
+	end
 	--test, remove later
-	if (btnp(🅾️)) setstate("over")
+	if (btnp(🅾️)) setstate("over") wvt=0
 	--move player
 	if (p.♥>0) p:update()
 	--move bullets
@@ -182,11 +214,31 @@ function draw_game()
 	for _,ptc in ipairs(pfx) do
 		ptc:draw()
 	end
-	--ui
+	--ui: score,health
 	print("score: "..score,40,0,12)
 	for i=1,p.m♥ do
 		sp=p.♥>=i and 11 or 12
 		spr(sp,(i-1)*8,1)
+	end
+	--ui: wave
+	if wvt>0 then
+		displaywavetxt()
+	end
+end
+
+--spawn wave
+function spawnwave(wave)
+	spawnenemies(3)
+end
+
+--incoming wave text
+do
+	local blnk=blink(8,6)
+	function displaywavetxt()
+		print("warning",51,32,blnk())
+		print("wave incoming",39,40,
+			blnk())
+		print("wave "..wave,53,90,6)
 	end
 end
 
@@ -321,10 +373,14 @@ function update_over()
 	end
 end
 
-function draw_over()
-	draw_game() --draw game in bg
-	print("game over",47,40,8)
-	print("press ❎ to restart",30,80,6+ceil(sin(time())))
+do
+	local blnk=blink(6,7)
+	function draw_over()
+		draw_game() --draw game in bg
+		print("game over",47,40,8)
+		print("press ❎ to restart",
+			25,80,blnk())
+	end
 end
 -->8
 --classes
@@ -468,7 +524,7 @@ function bullet:update()
 				sfx(2)
 				score+=10
 				--spawn new enemy
-				spawnenemy()
+--				spawnenemy()
 			end
 		end
 	end
