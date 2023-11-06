@@ -153,7 +153,7 @@ function update_game()
 	--spawn new wave
 	if wvt>0 then
 		wvt-=1
-		if (wvt==0) spawnwave()
+		if (wvt==0) spawnwave(wave)
 	end
 	--check if wave defeated
 	if #enemies==0 and wvt==0 then
@@ -180,7 +180,8 @@ function update_game()
 		--rm offscreen enemies
 		if e.y>128 then
 			del(enemies,e)
-			spawnenemy()
+			--respawn enemy of same type
+			spawnenemy(e)
 		end
 	end
 	--anim fx
@@ -228,7 +229,14 @@ end
 
 --spawn wave
 function spawnwave(wave)
-	spawnenemies(3)
+	local wvlt={
+		jelly,
+		green,
+		spinner
+	}
+	local etyp=(wave<=#wvlt) and wvlt[wave] or boss
+	local n=(wave<=3) and 3 or 1
+	spawnenemies(n,etyp)
 end
 
 --incoming wave text
@@ -243,17 +251,27 @@ do
 end
 
 --spawn enemy
-function spawnenemies(n)
-	for i=1,n do
-		local e=enemy:new{
-			x=rnd(120), --random x pos
-			y=-8 --offscreen (above)
-		}
-		add(enemies,e)
+do
+	local rtyp=function()
+		--local enemy type lookup
+		local typ={green,spinner,
+			jelly,boss}
+		local i=1+flr(rnd(#typ))
+		return typ[i]
+	end
+	function spawnenemies(n,typ)
+		for i=1,n do
+			local et=typ or rtyp()
+			local e=et:new{
+				x=rnd(120), --random x pos
+				y=-8 --offscreen (above)
+			}
+			add(enemies,e)
+		end
 	end
 end
-spawnenemy=function()
-	spawnenemies(1)
+spawnenemy=function(typ)
+	spawnenemies(1,typ)
 end
 
 --spawn explosion pfx
@@ -646,8 +664,7 @@ function enemy:update()
 	--dcrm dmg flash
 	if (self.flash>0) self.flash-=1
 	--anim
-	self.sp+=0.4
-	if (self.sp>=36) self.sp=32
+	self:anim()
 end
 function enemy:draw()
 	if self.flash>0 then
@@ -682,6 +699,50 @@ function enemy:draw()
 	--call parent draw fn
 	gmobj.draw(self)
 	pal() --reset palette
+end
+function enemy:anim()
+	self.sp+=0.4
+	if (self.sp>=36) self.sp=32
+end
+--alt name for default enemy
+green=enemy
+
+--spinner enemy
+spinner=enemy:new{
+	sp=120, --120-123
+--	♥=5,
+}
+--possibly a better way
+function spinner:anim()
+	self.sp+=0.4
+	if (self.sp>=124) self.sp=120
+end
+
+--jellyfish enemy
+jelly=enemy:new{
+	sp=101, --101-104
+	♥=2,
+}
+function jelly:anim()
+	self.sp+=0.4
+	if (self.sp>=105) self.sp=101
+end
+
+--boss
+boss=enemy:new{
+	sp=144, --144,146
+	♥=10,
+	spx=2,
+	spy=2,
+}
+do
+	local fr={144,146}
+	local i=1
+	function boss:anim()
+		i+=0.4
+		if (i>=3) i=1
+		self.sp=fr[i]
+	end
 end
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
