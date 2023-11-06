@@ -383,7 +383,7 @@ do
 	end
 end
 -->8
---classes
+--classes: gmobj & particles
 
 --util class to avoid repetition
 class={}
@@ -424,6 +424,98 @@ function gmobj:col(obj)
 	--otherwise: collision
 	return true
 end
+
+--particle class
+ptc=class:new{
+	x=0, --x
+	y=0, --y
+	r=0, --ptc radius
+	c=7, --default color
+	t=0, --ptc age
+	mt=30, --ptc max age
+}
+function ptc:update()
+	--update ptc age
+	self.t+=1
+	--if ptc too old, delete
+	if self.t>self.mt then
+		self:expire()
+	end
+end
+function ptc:draw()
+	if self.r<1 then
+		pset(self.x,self.y,self.c)
+	else
+		circfill(self.x,self.y,
+			self.r,self.c)
+	end
+end
+function ptc:expire()
+	del(pfx,self)
+end
+
+--spark ptc
+sprk=ptc:new{
+	dx=0, --x velocity
+	dy=0 --y velocity
+}
+function sprk:update()
+	--update position
+	self.x+=self.dx
+	self.y+=self.dy
+	--deccelerate ptc
+	self.dx*=0.85
+	self.dy*=0.85
+	--call parent update
+	ptc.update(self)
+end
+
+--explosion ptc
+expl=sprk:new{
+	explc="red"
+}
+do
+	local lt={
+		red={10,9,8,2,5},
+		blue={13,12,1,2,5},
+		green={13,11,3,2,5},
+		purple={14,13,14,2,5},
+	}
+	function expl:draw()
+		local ct=lt[self.explc]
+		local age=self.t/self.mt
+		if (age>0.2) self.c=ct[1]
+		if (age>0.3) self.c=ct[2]
+		if (age>0.5) self.c=ct[3]
+		if (age>0.6) self.c=ct[4]
+		if (age>0.8) self.c=ct[5]
+		--call parent draw
+		ptc.draw(self)
+	end
+end
+function expl:expire()
+	--if ptc too old, shrink/fade
+	self.r-=0.5
+	if (self.r<0) del(pfx,self)
+end
+
+--shockwave ptc
+skwv=ptc:new{
+	c=6, --default color
+	dr=1, --change in radius
+}
+function skwv:update()
+	--incr/dcrm radius
+	self.r+=self.dr
+	--call parent update
+	ptc.update(self)
+end
+function skwv:draw()
+	circ(self.x,self.y,
+		self.r,self.c)
+end
+-->8
+--classes: player,projectiles
 
 --player class
 player=gmobj:new{
@@ -530,6 +622,8 @@ function bullet:update()
 		end
 	end
 end
+-->8
+--classes: enemies
 
 --enemy class
 enemy=gmobj:new{
@@ -588,96 +682,6 @@ function enemy:draw()
 	--call parent draw fn
 	gmobj.draw(self)
 	pal() --reset palette
-end
-
---particle class
-ptc=class:new{
-	x=0, --x
-	y=0, --y
-	r=0, --ptc radius
-	c=7, --default color
-	t=0, --ptc age
-	mt=30, --ptc max age
-}
-function ptc:update()
-	--update ptc age
-	self.t+=1
-	--if ptc too old, delete
-	if self.t>self.mt then
-		self:expire()
-	end
-end
-function ptc:draw()
-	if self.r<1 then
-		pset(self.x,self.y,self.c)
-	else
-		circfill(self.x,self.y,
-			self.r,self.c)
-	end
-end
-function ptc:expire()
-	del(pfx,self)
-end
-
---spark ptc
-sprk=ptc:new{
-	dx=0, --x velocity
-	dy=0 --y velocity
-}
-function sprk:update()
-	--update position
-	self.x+=self.dx
-	self.y+=self.dy
-	--deccelerate ptc
-	self.dx*=0.85
-	self.dy*=0.85
-	--call parent update
-	ptc.update(self)
-end
-
---explosion ptc
-expl=sprk:new{
-	explc="red"
-}
-do
-	local lt={
-		red={10,9,8,2,5},
-		blue={13,12,1,2,5},
-		green={13,11,3,2,5},
-		purple={14,13,14,2,5},
-	}
-	function expl:draw()
-		local ct=lt[self.explc]
-		local age=self.t/self.mt
-		if (age>0.2) self.c=ct[1]
-		if (age>0.3) self.c=ct[2]
-		if (age>0.5) self.c=ct[3]
-		if (age>0.6) self.c=ct[4]
-		if (age>0.8) self.c=ct[5]
-		--call parent draw
-		ptc.draw(self)
-	end
-end
-function expl:expire()
-	--if ptc too old, shrink/fade
-	self.r-=0.5
-	if (self.r<0) del(pfx,self)
-end
-
---shockwave ptc
-skwv=ptc:new{
-	c=6, --default color
-	dr=1, --change in radius
-}
-function skwv:update()
-	--incr/dcrm radius
-	self.r+=self.dr
-	--call parent update
-	ptc.update(self)
-end
-function skwv:draw()
-	circ(self.x,self.y,
-		self.r,self.c)
 end
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
