@@ -181,6 +181,7 @@ function update_game()
 		if e.y>128 then
 			del(enemies,e)
 			--respawn enemy of same type
+			-- also retains prev dmg
 			spawnenemy(e)
 		end
 	end
@@ -620,7 +621,7 @@ function bullet:update()
 		if self:col(e) then
 			--todo: enemy bullets
 			e.♥-=1
-			e.flash=4
+			e.flsh=4
 			spawnimpact(self.x+4,
 				self.y+4)
 			sfx(3)
@@ -647,7 +648,7 @@ end
 enemy=gmobj:new{
 	sp=32, --enemy sprite
 	♥=5, --enemy health
-	flash=0 --dmg indicator
+	flsh=0 --dmg flash
 }
 function enemy:update()
 	self.y+=1
@@ -662,44 +663,28 @@ function enemy:update()
 		p.invul=60
 	end
 	--dcrm dmg flash
-	if (self.flash>0) self.flash-=1
+	if (self.flsh>0) self.flsh-=1
 	--anim
 	self:anim()
 end
 function enemy:draw()
-	if self.flash>0 then
-		--turn red when dmg
---		pal(3,8) --d grn to d red
---		pal(11,14) --l grn to pink
-
-		--brighten colors/darken white
---		pal(1,12) --d blue to l blue
---		pal(3,11) --d grn to l grn
---		pal(7,5) --white to d grey
---		pal(11,7) --l grn to white
-
-		--turn white when dmg
---		for i=1,15 do
---			pal(i,7)
---		end
-
-		--kinda color invert
-		pal(1,8) --d blue to brwn
-		pal(3,2) --d grn to purple
-		pal(7,0) --white to blck
-		pal(11,14) --l grn to pink
-
-		--"true" color invert
---		pal(1,15) --d blue to sand
---		pal(3,14) --d grn to pink
---		pal(7,0) --white to blck
---		pal(11,2) --l grn to purple
-
-	end
+	--manipulate palette to flash
+	-- when taking damage
+	if (self.flsh>0) self:flash()
 	--call parent draw fn
 	gmobj.draw(self)
 	pal() --reset palette
+	--debug
+--	print(self.flsh,self.x,self.y+8,8)
 end
+function enemy:flash()
+	--kinda color invert
+	pal(1,8) --d blue to brwn
+	pal(3,2) --d grn to purple
+	pal(7,0) --white to blck
+	pal(11,14) --l grn to pink
+end
+--update the enemy sprite
 function enemy:anim()
 	self.sp+=0.4
 	if (self.sp>=36) self.sp=32
@@ -713,6 +698,9 @@ spinner=enemy:new{
 --	♥=5,
 }
 --possibly a better way
+function spinner:flash()
+	pal() --do nothing
+end
 function spinner:anim()
 	self.sp+=0.4
 	if (self.sp>=124) self.sp=120
@@ -723,6 +711,9 @@ jelly=enemy:new{
 	sp=101, --101-104
 	♥=2,
 }
+function jelly:flash()
+	pal() --do nothing
+end
 function jelly:anim()
 	self.sp+=0.4
 	if (self.sp>=105) self.sp=101
@@ -732,17 +723,27 @@ end
 boss=enemy:new{
 	sp=144, --144,146
 	♥=10,
-	spx=2,
-	spy=2,
+	spx=2, --sprite width
+	spy=2, --sprite height
 }
+function boss:flash()
+	pal() --do nothing
+end
 do
-	local fr={144,146}
 	local i=1
+	local fr={144,146}
 	function boss:anim()
-		i+=0.4
-		if (i>=3) i=1
-		self.sp=fr[i]
+		i+=0.2
+		if (flr(i)>#fr) i=1
+		self.sp=fr[flr(i)]
 	end
+--	function boss:draw()
+--		--call to parent draw
+--		enemy.draw(self)
+--		--debug
+--		print(self.sp,self.x,self.y,8)
+--		print(i,self.x,self.y+6,8)
+--	end
 end
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
