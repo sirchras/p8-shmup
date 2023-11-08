@@ -159,7 +159,14 @@ function update_game()
 	if #enemies==0 and wvt==0 then
 		wave+=1
 		--check if defeated all waves?
-		wvt=60
+		if wave>4 then
+			if not isstatetrans() then
+				--don't like how nested it is
+				gameover(true)
+			end
+		else
+			wvt=60
+		end
 	end
 	--test, remove later
 	if (btnp(🅾️)) setstate("over") wvt=0
@@ -372,33 +379,47 @@ function bgrnd()
 end
 -->8
 --over state
-function gameover()
-	--set state, play music
-	setstate("over",30)
---	setstate("over")
-	music(6)
-	setbtnpdelay()
-end
-
-function update_over()
-	--anim any remaining ptc
-	for ptc in all(pfx) do
-		ptc:update()
-	end
-	if btnp(❎) then
-		--start game
---		startgame()
-		startscrn()
-	end
-end
-
 do
+	local drawtxt,drawwin,drawlose
+	function gameover(win)
+		--set state
+		setstate("over",30)
+		drawtxt=win and drawwin
+			or drawlose
+--		setstate("over")
+		--play music
+		music(win and 0 or 6)
+		--set btnp delay
+		setbtnpdelay()
+	end
+
+	function update_over()
+		--anim any remaining ptc
+		for ptc in all(pfx) do
+			ptc:update()
+		end
+		if btnp(❎) then
+			--start game
+	--		startgame()
+			startscrn()
+		end
+	end
+
 	local blnk=blink(6,7)
 	function draw_over()
 		draw_game() --draw game in bg
-		print("game over",47,40,8)
+		drawtxt()
 		print("press ❎ to restart",
 			25,80,blnk())
+	end
+
+	--drawtxt
+	drawwin=function()
+		print("congratulations",35,
+			40,12)
+	end
+	drawlose=function()
+		print("game over",47,40,8)
 	end
 end
 -->8
