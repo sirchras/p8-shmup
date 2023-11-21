@@ -276,10 +276,14 @@ function spawnenemies(row,i)
 	end
 end
 
-function spawnenemy(typ,x,y)
+function spawnenemy(typ,x,y,tx,ty)
+	local x=x or rnd(120)
 	local e=typ:new{
-		x=x or rnd(120),
-		y=y or -8
+		x=x,
+		y=y or -8,
+		--perhaps vectors?
+		tx=tx or x,
+		ty=y+40
 	}
 	add(enemies,e)
 --	return e
@@ -672,10 +676,15 @@ end
 enemy=gmobj:new{
 	sp=32, --enemy sprite
 	♥=5, --enemy health
-	flsh=0 --dmg flash
+	flsh=0,--dmg flash
+	act=nil, --current action: adv,hold,atk
+	tx=0, --target x position
+	ty=0, --target y position
 }
 function enemy:update()
-	self.y+=1
+	if (not self.act) self.act=self.adv
+	self:act()
+--	self.y+=1
 	--check enemy/player collision
 	if self:col(p) and
 	   p.invul==0 then
@@ -702,29 +711,44 @@ function enemy:draw()
 --	print(self.flsh,self.x,self.y+8,8)
 end
 function enemy:flash()
-	--kinda color invert
-	pal(1,8) --d blue to brwn
-	pal(3,2) --d grn to purple
-	pal(7,0) --white to blck
-	pal(11,14) --l grn to pink
+	--flash white on dmg
+	for i=1,15 do
+		pal(i,7)
+	end
 end
 --update the enemy sprite
 function enemy:anim()
 	self.sp+=0.4
 	if (self.sp>=36) self.sp=32
 end
---alt name for default enemy
-green=enemy
+--enemy behavior: advance
+function enemy:adv()
+	--would vectors make this easier?
+	--almost certainly
+	self.y+=1
+	if self.y>=self.ty then
+		self.act=self.hold
+	end
+end
+function enemy:hold()
+	--do something?
+end
+
+--default green enemy
+green=enemy:new()
+--function green:flash()
+--	--kinda color invert
+--	pal(1,8) --d blue to brwn
+--	pal(3,2) --d grn to purple
+--	pal(7,0) --white to blck
+--	pal(11,14) --l grn to pink
+--end
 
 --spinner enemy
 spinner=enemy:new{
 	sp=120, --120-123
 --	♥=5,
 }
---possibly a better way
-function spinner:flash()
-	pal() --do nothing
-end
 function spinner:anim()
 	self.sp+=0.4
 	if (self.sp>=124) self.sp=120
@@ -735,9 +759,6 @@ jelly=enemy:new{
 	sp=101, --101-104
 	♥=2,
 }
-function jelly:flash()
-	pal() --do nothing
-end
 function jelly:anim()
 	self.sp+=0.4
 	if (self.sp>=105) self.sp=101
@@ -750,9 +771,6 @@ boss=enemy:new{
 	spx=2, --sprite width
 	spy=2, --sprite height
 }
-function boss:flash()
-	pal() --do nothing
-end
 do
 	local i=1
 	local fr={144,146}
