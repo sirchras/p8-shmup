@@ -170,8 +170,6 @@ function update_game()
 			music(3)
 		end
 	end
-	--test, remove later
-	if (btnp(🅾️)) setstate("over") wvt=0
 	--move player
 	if (p.♥>0) p:update()
 	--move bullets
@@ -239,16 +237,18 @@ end
 
 --spawn wave
 function spawnwave(wave)
-	--temp logic to spawn 1 type
-	-- per wave
-	local wvlt={
-		jelly,
-		green,
-		spinner
+	local y=-8
+	local wave={
+--		{1,1,1,1,1,1,1,1,1,1},
+		{0,0,1,0,1,1,0,1,0,0},
+		{2,1,0,1,0,0,1,0,1,3},
+		{3,1,0,1,0,0,1,0,1,2},
+		{0,0,1,0,1,1,0,1,0,0},
 	}
-	local etyp=(wave<=#wvlt) and wvlt[wave] or boss
-	local n=(wave<=3) and 3 or 1
-	spawnenemies(n,etyp)
+	for i=#wave,1,-1 do
+		local row=wave[i]
+		spawnenemies(row,#wave-i)
+	end
 end
 
 --incoming wave text
@@ -262,28 +262,27 @@ do
 	end
 end
 
---spawn enemy
-do
-	local rtyp=function()
-		--local enemy type lookup
-		local typ={green,spinner,
-			jelly,boss}
-		local i=1+flr(rnd(#typ))
-		return typ[i]
-	end
-	function spawnenemies(n,typ)
-		for i=1,n do
-			local et=typ or rtyp()
-			local e=et:new{
-				x=rnd(120), --random x pos
-				y=-8 --offscreen (above)
-			}
-			add(enemies,e)
-		end
+--spawn a row of enemies
+function spawnenemies(row,i)
+	local x,y=6,-10*i
+	local etyp={green,spinner,
+		jelly}
+	for i=1,#row do
+		local et=etyp[row[i]]
+		if (not et) goto nxt
+		spawnenemy(et,x,y)
+		::nxt::
+		x+=(et and et.spx*8 or 8)+4
 	end
 end
-spawnenemy=function(typ)
-	spawnenemies(1,typ)
+
+function spawnenemy(typ,x,y)
+	local e=typ:new{
+		x=x or rnd(120),
+		y=y or -8
+	}
+	add(enemies,e)
+--	return e
 end
 
 --spawn explosion pfx
