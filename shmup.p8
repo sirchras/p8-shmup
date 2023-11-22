@@ -239,11 +239,14 @@ end
 function spawnwave(wave)
 	local y=-8
 	local wave={
---		{1,1,1,1,1,1,1,1,1,1},
-		{0,0,1,0,1,1,0,1,0,0},
-		{2,1,0,1,0,0,1,0,1,3},
-		{3,1,0,1,0,0,1,0,1,2},
-		{0,0,1,0,1,1,0,1,0,0},
+		{1,1,1,1,1,1,1,1,1,1},
+		{1,1,1,1,1,1,1,1,1,1},
+		{1,1,1,1,1,1,1,1,1,1},
+		{1,1,1,1,1,1,1,1,1,1},
+--		{0,0,1,0,1,1,0,1,0,0},
+--		{2,1,0,1,0,0,1,0,1,3},
+--		{3,1,0,1,0,0,1,0,1,2},
+--		{0,0,1,0,1,1,0,1,0,0},
 	}
 	for i=#wave,1,-1 do
 		local row=wave[i]
@@ -264,15 +267,16 @@ end
 
 --spawn a row of enemies
 function spawnenemies(row,i)
-	local x,y=6,-10*i
+	local x,y=6,-10*(i+1)
 	local etyp={green,spinner,
 		jelly}
 	for i=1,#row do
 		local et=etyp[row[i]]
 		if (not et) goto nxt
-		spawnenemy(et,x,y)
+		e=spawnenemy(et,x,y)
+		e.wait=i*3
 		::nxt::
-		x+=(et and et.spx*8 or 8)+4
+		x+=(e and e.spx*8 or 8)+4
 	end
 end
 
@@ -283,10 +287,10 @@ function spawnenemy(typ,x,y,tx,ty)
 		y=y or -8,
 		--perhaps vectors?
 		tx=tx or x,
-		ty=y+40
+		ty=y+56
 	}
 	add(enemies,e)
---	return e
+	return e
 end
 
 --spawn explosion pfx
@@ -680,8 +684,13 @@ enemy=gmobj:new{
 	act=nil, --current action: adv,hold,atk
 	tx=0, --target x position
 	ty=0, --target y position
+	wait=0, --wait before active
 }
 function enemy:update()
+	if self.wait>0 then
+		self.wait-=1
+		return
+	end
 	if (not self.act) self.act=self.adv
 	self:act()
 --	self.y+=1
@@ -708,7 +717,7 @@ function enemy:draw()
 	gmobj.draw(self)
 	pal() --reset palette
 	--debug
---	print(self.flsh,self.x,self.y+8,8)
+--	print(self.y,self.x,self.y+8,8)
 end
 function enemy:flash()
 	--flash white on dmg
@@ -724,8 +733,10 @@ end
 --enemy behavior: advance
 function enemy:adv()
 	--would vectors make this easier?
-	--almost certainly
-	self.y+=1
+	--well better at least...
+--	self.y+=3
+	--add basic easing
+	self.y+=(self.ty-self.y)/8
 	if self.y>=self.ty then
 		self.act=self.hold
 	end
