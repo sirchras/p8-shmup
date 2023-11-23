@@ -266,31 +266,40 @@ do
 end
 
 --spawn a row of enemies
+-- this is a math nightmare
+-- and prob should be fixed
 function spawnenemies(row,i)
 	local x,y=6,-10*(i+1)
 	local etyp={green,spinner,
 		jelly}
 	for i=1,#row do
-		local et=etyp[row[i]]
+		local et,e,x0=etyp[row[i]]
 		if (not et) goto nxt
-		e=spawnenemy(et,x,y)
-		e.wait=i*3
+		x0=64+24*(i-(#row/2)-0.5)
+		e=spawnenemy(et,x0,y)
+		--perhaps vectors?
+		e.tx,e.ty=x,y+56
+		--this could use trig if i felt extra
+--		e.wait=i*3
+		e.wait=abs(i-(#row/2)-0.5)*3
+--		e.wait=(5-abs(i-(#row/2)-0.5))*3
 		::nxt::
 		x+=(e and e.spx*8 or 8)+4
 	end
 end
 
-function spawnenemy(typ,x,y,tx,ty)
-	local x=x or rnd(120)
+function spawnenemy(typ,x,y)
 	local e=typ:new{
-		x=x,
+		x=x or rnd(120),
 		y=y or -8,
-		--perhaps vectors?
-		tx=tx or x,
-		ty=y+56
 	}
 	add(enemies,e)
 	return e
+end
+
+--select random enemy
+function selectenemy()
+	local e=rnd(enemies)
 end
 
 --spawn explosion pfx
@@ -718,6 +727,11 @@ function enemy:draw()
 	pal() --reset palette
 	--debug
 --	print(self.y,self.x,self.y+8,8)
+--	if (self.wait) print(self.wait,self.x,self.y+8,8)
+	local atk=(self.act==self.atk)
+	local adv=(self.act==self.adv)
+	local hold=(self.act==self.hold)
+	print(hold and "y" or "n",self.x,self.y+8,8)
 end
 function enemy:flash()
 	--flash white on dmg
@@ -736,13 +750,19 @@ function enemy:adv()
 	--well better at least...
 --	self.y+=3
 	--add basic easing
+	self.x+=(self.tx-self.x)/8
 	self.y+=(self.ty-self.y)/8
-	if self.y>=self.ty then
+	if abs(self.y-self.ty)<0.5 then
+		self.y=self.ty
+		self.x=self.tx
 		self.act=self.hold
 	end
 end
 function enemy:hold()
 	--do something?
+end
+function enemy:atk()
+	--attack
 end
 
 --default green enemy
