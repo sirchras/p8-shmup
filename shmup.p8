@@ -192,6 +192,11 @@ function update_game()
 --			spawnenemy(e)
 		end
 	end
+	--select enemy to attack
+	if #enemies>0 and time()%2==0 then
+		local e=selectenemy()
+		e.act=e.atk
+	end
 	--anim fx
 	for ptc in all(pfx) do
 		ptc:update()
@@ -297,9 +302,17 @@ function spawnenemy(typ,x,y)
 	return e
 end
 
---select random enemy
+--select enemy to attack
 function selectenemy()
-	local e=rnd(enemies)
+--	local e=rnd(enemies)
+	local e
+	while not e do
+		local r=rnd(enemies)
+		--only select enemies that
+		--	are holding
+		if (r.act==r.hold) e=r
+	end
+	return e
 end
 
 --spawn explosion pfx
@@ -763,6 +776,7 @@ function enemy:hold()
 end
 function enemy:atk()
 	--attack
+	self.y+=1
 end
 
 --default green enemy
