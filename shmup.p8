@@ -195,7 +195,9 @@ function update_game()
 	--select enemy to attack
 	if #enemies>0 and time()%2==0 then
 		local e=selectenemy()
-		e.act=e.atk
+		if e and e.act==e.hold then
+			e.act=e.atk
+		end
 	end
 	--anim fx
 	for ptc in all(pfx) do
@@ -253,7 +255,7 @@ function spawnwave(wave)
 --		{3,1,0,1,0,0,1,0,1,2},
 --		{0,0,1,0,1,1,0,1,0,0},
 	}
-	for i=#wave,1,-1 do
+	for i=1,#wave do
 		local row=wave[i]
 		spawnenemies(row,#wave-i)
 	end
@@ -302,17 +304,30 @@ function spawnenemy(typ,x,y)
 	return e
 end
 
---select enemy to attack
+--select available enemy to atk
+-- bias towards front
+--fn might be doing too much...
 function selectenemy()
 --	local e=rnd(enemies)
-	local e
-	while not e do
-		local r=rnd(enemies)
-		--only select enemies that
-		--	are holding
-		if (r.act==r.hold) e=r
+	local r=#enemies%10
+	local n=r==0 and 10 or r
+	local i=#enemies-n+1
+	--get vanguard of formation
+	local tbl={
+		unpack(enemies,i,#enemies)
+	}
+	--filter out busy enemies
+	for e in all(tbl) do
+		if (e.act!=e.hold) del(tbl,e)
 	end
-	return e
+	if (#tbl>0) return rnd(tbl)
+	--select from behind vanguard
+	i-=1+flr(rnd(10))
+	if i>0 then
+		local e=enemies[i]
+		if (e.act==e.hold) return e
+	end
+	return nil
 end
 
 --spawn explosion pfx
