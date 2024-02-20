@@ -141,7 +141,7 @@ function startgame()
 	m_flsh=0
 	--enemies
 	enemies={}
---	spawnenemies(2)
+	atkfreq=60
 	--fx
 --	effects={} --sprite effects
 	pfx={} --particles
@@ -158,6 +158,8 @@ function update_game()
 	--check if wave defeated
 	if #enemies==0 and wvt==0 then
 		wave+=1
+		--temp, find better alt
+		atkfreq-=10
 		--check if defeated all waves?
 		if wave>4 then
 			if not isstatetrans() then
@@ -193,10 +195,13 @@ function update_game()
 		end
 	end
 	--select enemy to attack
-	if #enemies>0 and time()%2==0 then
+	local fr=time()*30
+	if #enemies>0 and fr%atkfreq==0 then
 		local e=selectenemy()
 		if e and e.act==e.hold then
 			e.act=e.atk
+			--debug
+--			e.frame=fr
 		end
 	end
 	--anim fx
@@ -240,6 +245,13 @@ function draw_game()
 	if wvt>0 then
 		displaywavetxt()
 	end
+end
+
+--todo:
+--next wave/update wave?
+function nextwave()
+	--move wave code from update
+	-- function here
 end
 
 --spawn wave
@@ -494,6 +506,14 @@ function gmobj:draw()
 	spr(self.sp,self.x,self.y,
 		self.spx,self.spy)
 end
+--should this be on this class?
+function gmobj:move(dx,dy)
+	--todo
+	local dx=dx or 0
+	local dy=dy or 0
+	self.x+=dx
+	self.y+=dy
+end
 --collisions (square)
 function gmobj:col(obj)
 	local sw,sh=(8*self.spx)-1,(8*self.spy)-1
@@ -619,7 +639,7 @@ player=gmobj:new{
 }
 function player:update()
 	local sp=2 --default sprite
-	local x,y=self.x,self.y
+	local s=self.s
 	local dx,dy=0,0
 	--btn input
 	--⬆️⬇️⬅️➡️❎
@@ -629,13 +649,16 @@ function player:update()
 	if btn(➡️) then
 		dx,sp=self.s,3
 	end
-	if btn(⬆️) then dy=-self.s end
-	if btn(⬇️) then dy=self.s end
+	if (btn(⬆️)) dy=-self.s
+	if (btn(⬇️)) dy=self.s
 --	if btn(❎) and self.fc<=0 then
 	if btnp(❎) then
 		--spawn new bullet
-		b=bullet:new{x=x,y=y-6,dy=-2}
-		add(bullets,b)
+		add(bullets,bullet:new{
+			x=self.x,
+			y=self.y-6,
+			dy=-2
+		})
 		--reset fire cooldown
 		self.fc=self.fr
 		--set muzzle flash
@@ -644,8 +667,9 @@ function player:update()
 		sfx(0)
 	end
 	--move/update player
-	self.x=mid(0,x+dx,120)
-	self.y=mid(0,y+dy,120)
+	self:move(dx,dy)
+	self.x=mid(0,self.x,120)
+	self.y=mid(0,self.y,120)
 	self.sp=sp
 	--decrm iframes
 	if (self.invul>0) self.invul-=1
@@ -683,8 +707,7 @@ bullet=gmobj:new{
 	dy=0 --y velocity
 }
 function bullet:update()
-	self.x+=self.dx
-	self.y+=self.dy
+	self:move(self.dx,self.dy)
 	for i=#enemies,1,-1 do
 		local e=enemies[i]
 		if self:col(e) then
@@ -756,10 +779,11 @@ function enemy:draw()
 	--debug
 --	print(self.y,self.x,self.y+8,8)
 --	if (self.wait) print(self.wait,self.x,self.y+8,8)
-	local atk=(self.act==self.atk)
-	local adv=(self.act==self.adv)
-	local hold=(self.act==self.hold)
-	print(hold and "y" or "n",self.x,self.y+8,8)
+--	local atk=(self.act==self.atk)
+--	local adv=(self.act==self.adv)
+--	local hold=(self.act==self.hold)
+--	print(hold and "y" or "n",self.x,self.y+8,8)
+--	if (self.frame) print(self.frame,self.x,self.y+8,8)
 end
 function enemy:flash()
 	--flash white on dmg
@@ -774,9 +798,8 @@ function enemy:anim()
 end
 --enemy behavior: advance
 function enemy:adv()
-	--would vectors make this easier?
-	--well better at least...
---	self.y+=3
+	--could use gmobj.move but
+	-- would prob be messier
 	--add basic easing
 	self.x+=(self.tx-self.x)/8
 	self.y+=(self.ty-self.y)/8
@@ -795,7 +818,9 @@ function enemy:atk()
 end
 
 --default green enemy
-green=enemy:new()
+green=enemy:new{
+	typ="green",
+}
 --function green:flash()
 --	--kinda color invert
 --	pal(1,8) --d blue to brwn
@@ -806,6 +831,7 @@ green=enemy:new()
 
 --spinner enemy
 spinner=enemy:new{
+	typ="spinner",
 	sp=120, --120-123
 --	♥=5,
 }
@@ -816,6 +842,7 @@ end
 
 --jellyfish enemy
 jelly=enemy:new{
+	typ="jelly",
 	sp=101, --101-104
 	♥=2,
 }
@@ -824,7 +851,8 @@ function jelly:anim()
 	if (self.sp>=105) self.sp=101
 end
 
---boss
+--todo: change name
+--golden bug?
 boss=enemy:new{
 	sp=144, --144,146
 	♥=10,
