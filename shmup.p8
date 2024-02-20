@@ -801,20 +801,21 @@ function enemy:adv()
 	--could use gmobj.move but
 	-- would prob be messier
 	--add basic easing
-	self.x+=(self.tx-self.x)/8
-	self.y+=(self.ty-self.y)/8
+	local dx=(self.tx-self.x)/8
+	local dy=(self.ty-self.y)/8
 	if abs(self.y-self.ty)<0.5 then
 		self.y=self.ty
 		self.x=self.tx
 		self.act=self.hold
 	end
+	self:move(dx,dy)
 end
 function enemy:hold()
 	--do something?
 end
 function enemy:atk()
 	--attack
-	self.y+=1
+	self:move(0,1)
 end
 
 --default green enemy
