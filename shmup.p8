@@ -745,6 +745,8 @@ enemy=gmobj:new{
 	tx=0, --target x position
 	ty=0, --target y position
 	wait=0, --wait before active
+
+--	dx=0 --for testing, rm later
 }
 function enemy:update()
 	if self.wait>0 then
@@ -784,6 +786,7 @@ function enemy:draw()
 --	local hold=(self.act==self.hold)
 --	print(hold and "y" or "n",self.x,self.y+8,8)
 --	if (self.frame) print(self.frame,self.x,self.y+8,8)
+--	if (self.act==self.atk) print(self.dx,self.x,self.y+8,8)
 end
 function enemy:flash()
 	--flash white on dmg
@@ -829,6 +832,16 @@ green=enemy:new{
 --	pal(7,0) --white to blck
 --	pal(11,14) --l grn to pink
 --end
+function green:atk()
+--	local dx=sin(time()*30/20)
+	local d,dx=p.x-self.x
+	dx=sgn(d)*min(abs(d),20)/30
+	dx+=sin(time()*30/20)
+--	self.dx=dx --dbugging
+	local dy=1
+	self:move(dx,dy)
+	self.x=mid(0,self.x,120)
+end
 
 --spinner enemy
 spinner=enemy:new{
