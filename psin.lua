@@ -1,9 +1,9 @@
-sin,pi=math.sin,math.pi
+SIN,PI=math.sin,math.pi
 
-function psin(x,d)
+local psin=function(x,d)
   for i=0,x do
     local q=i/d
-    print(q.." "..sin(-2*pi*q))
+    print(q.." "..SIN(-2*PI*q))
     if q>=1 then break end
   end
 end
