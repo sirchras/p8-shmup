@@ -132,6 +132,7 @@ function startgame()
 	music(0)
 	--set score,wave
 	score=0
+	waves=init_waves()
 	wave=1
 	wvt=60 --wave timer
 	--player
@@ -141,7 +142,7 @@ function startgame()
 	m_flsh=0
 	--enemies
 	enemies={}
-	atkfreq=60
+	atkfreq=waves[wave].atkfreq
 	--fx
 --	effects={} --sprite effects
 	pfx={} --particles
@@ -157,20 +158,7 @@ function update_game()
 	end
 	--check if wave defeated
 	if #enemies==0 and wvt==0 then
-		wave+=1
-		--temp, find better alt
-		atkfreq-=10
-		--check if defeated all waves?
-		if wave>4 then
-			if not isstatetrans() then
-				--don't like how nested it is
-				gameover(true)
-			end
-		else
-			wvt=60
-			--play music
-			music(3)
-		end
+		nextwave()
 	end
 	--move player
 	if (p.♥>0) p:update()
@@ -247,26 +235,29 @@ function draw_game()
 	end
 end
 
---todo:
---next wave/update wave?
+--next wave
 function nextwave()
-	--move wave code from update
-	-- function here
+	--do nothing if state trans
+	if (isstatetrans()) return
+	--get next wave if more waves
+	if wave<#waves then
+		--inc wave count
+		wave+=1
+		--update enemy atkfreq
+		atkfreq=waves[wave].atkfreq
+		wvt=60
+		--play wave music
+		music(3)
+		return
+	end
+	--if no more waves, gameover
+	gameover(true)
 end
 
 --spawn wave
 function spawnwave(wave)
 	local y=-8
-	local wave={
-		{1,1,1,1,1,1,1,1,1,1},
-		{1,1,1,1,1,1,1,1,1,1},
-		{1,1,1,1,1,1,1,1,1,1},
-		{1,1,1,1,1,1,1,1,1,1},
---		{0,0,1,0,1,1,0,1,0,0},
---		{2,1,0,1,0,0,1,0,1,3},
---		{3,1,0,1,0,0,1,0,1,2},
---		{0,0,1,0,1,1,0,1,0,0},
-	}
+	local wave=waves[wave]
 	for i=1,#wave do
 		local row=wave[i]
 		spawnenemies(row,#wave-i)
@@ -888,6 +879,44 @@ do
 --		print(self.sp,self.x,self.y,8)
 --		print(i,self.x,self.y+6,8)
 --	end
+end
+-->8
+--waves
+function init_waves()
+	return {
+		{
+			--wave 1
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			atkfreq=60
+		},
+		{
+			--wave 2
+			{0,0,1,0,1,1,0,1,0,0},
+			{2,1,0,1,0,0,1,0,1,3},
+			{3,1,0,1,0,0,1,0,1,2},
+			{0,0,1,0,1,1,0,1,0,0},
+			atkfreq=50
+		},
+		{
+			--wave 3
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			atkfreq=40
+		},
+		{
+			--wave 4
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			atkfreq=30
+		},
+	}
 end
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
