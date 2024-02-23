@@ -180,11 +180,9 @@ function update_game()
 	for e in all(enemies) do
 		e:update()
 		--rm offscreen enemies
-		if e.y>128 then
-			del(enemies,e)
-			--respawn enemy of same type
-			-- also retains prev dmg
---			spawnenemy(e)
+		if e.y>128 or
+		   e.x<-8 or e.x>128 then
+			if (e.act==e.atk) del(enemies,e)
 		end
 	end
 	--select enemy to attack
@@ -192,9 +190,11 @@ function update_game()
 	if #enemies>0 and fr%atkfreq==0 then
 		local e=selectenemy()
 		if e and e.act==e.hold then
+			e.wait=30
+			e.shke=30
 			e.act=e.atk
 			--debug
-			e.frame=fr
+--			e.frame=fr
 		end
 	end
 	--anim fx
@@ -286,7 +286,7 @@ end
 function spawnenemies(row,i)
 	local x,y=6,-10*(i+1)
 	local etyp={green,spinner,
-		jelly}
+		jelly,red,bb}
 	for i=1,#row do
 		local et,e,x0=etyp[row[i]]
 		if (not et) goto nxt
@@ -735,16 +735,17 @@ end
 --enemy class
 enemy=gmobj:new{
 	sp=32, --enemy sprite
-	♥=5, --enemy health
+	♥=3, --enemy health
 	flsh=0,--dmg flash
 	act=nil, --current action: adv,hold,atk
 	tx=0, --target x position
 	ty=0, --target y position
 	wait=0, --wait before active
-
---	dx=0 --for testing, rm later
+	shke=0, --shake
+	s=1, --default speed
 }
 function enemy:update()
+	if (self.shke>0) self.shke-=1
 	if self.wait>0 then
 		self.wait-=1
 		return
@@ -771,8 +772,19 @@ function enemy:draw()
 	--manipulate palette to flash
 	-- when taking damage
 	if (self.flsh>0) self:flash()
+	--cpy to prevent mutation
+	local obj={
+		x=self.x,
+		y=self.y,
+		sp=self.sp,
+		spx=self.spx,
+		spy=self.spy
+	}
+	if (self.shke>0) then
+		obj.x+=sin(time()*30/3)
+	end
 	--call parent draw fn
-	gmobj.draw(self)
+	gmobj.draw(obj)
 	pal() --reset palette
 	--debug
 --	print(self.y,self.x,self.y+8,8)
@@ -781,7 +793,7 @@ function enemy:draw()
 --	local adv=(self.act==self.adv)
 --	local hold=(self.act==self.hold)
 --	print(hold and "y" or "n",self.x,self.y+8,8)
-	if (self.frame) print(self.frame,self.x,self.y+8,8)
+--	if (self.frame) print(self.frame,self.x,self.y+8,8)
 --	if (self.act==self.atk) print(self.dx,self.x,self.y+8,8)
 end
 function enemy:flash()
@@ -797,9 +809,6 @@ function enemy:anim()
 end
 --enemy behavior: advance
 function enemy:adv()
-	--could use gmobj.move but
-	-- would prob be messier
-	--add basic easing
 	local dx=(self.tx-self.x)/8
 	local dy=(self.ty-self.y)/8
 	if abs(self.y-self.ty)<0.5 then
@@ -814,7 +823,7 @@ function enemy:hold()
 end
 function enemy:atk()
 	--attack
-	self:move(0,1)
+	self:move(0,self.s)
 end
 
 --default green enemy
@@ -829,13 +838,11 @@ green=enemy:new{
 --	pal(11,14) --l grn to pink
 --end
 function green:atk()
---	local dx=sin(time()*30/20)
 	local d,dx=p.x-self.x,0
 	if self.y<p.y then
 		dx=sgn(d)*min(abs(d),20)/30
 	end
 	dx+=sin(time()*30/20)
---	self.dx=dx --dbugging
 	local dy=1
 	self:move(dx,dy)
 	self.x=mid(0,self.x,120)
@@ -845,11 +852,25 @@ end
 spinner=enemy:new{
 	typ="spinner",
 	sp=120, --120-123
+	dx=0,
 --	♥=5,
 }
 function spinner:anim()
 	self.sp+=0.4
 	if (self.sp>=124) self.sp=120
+end
+function spinner:atk()
+	local dy=0
+	if self.dx==0 then
+		if p.y<=self.y then
+			--mv horizontally
+			self.dx=sgn(p.x-self.x)*2
+		else
+			--continue vertically
+			dy=1
+		end
+	end
+	self:move(self.dx,dy)
 end
 
 --jellyfish enemy
@@ -863,29 +884,40 @@ function jelly:anim()
 	if (self.sp>=105) self.sp=101
 end
 
+--red
+red=enemy:new{
+	typ="red",
+	sp=84, --84-85
+	♥=2,
+}
+function red:anim()
+	self.sp+=0.2
+	if (self.sp>=86) self.sp=84
+end
+function red:atk()
+	local dx=sin(time()*30/20)
+	local dy=2.5
+	self:move(dx,dy)
+	self.x=mid(0,self.x,120)
+end
+
 --todo: change name
 --golden bug?
-boss=enemy:new{
+bb=enemy:new{
 	sp=144, --144,146
 	♥=10,
 	spx=2, --sprite width
 	spy=2, --sprite height
+	s=0.5,
 }
 do
 	local i=1
 	local fr={144,146}
-	function boss:anim()
+	function bb:anim()
 		i+=0.2
 		if (flr(i)>#fr) i=1
 		self.sp=fr[flr(i)]
 	end
---	function boss:draw()
---		--call to parent draw
---		enemy.draw(self)
---		--debug
---		print(self.sp,self.x,self.y,8)
---		print(i,self.x,self.y+6,8)
---	end
 end
 -->8
 --waves
@@ -902,8 +934,8 @@ function init_waves()
 		{
 			--wave 2
 			{0,0,1,0,1,1,0,1,0,0},
-			{2,1,0,1,0,0,1,0,1,3},
-			{3,1,0,1,0,0,1,0,1,2},
+			{2,1,0,1,4,4,1,0,1,3},
+			{3,1,0,1,4,4,1,0,1,2},
 			{0,0,1,0,1,1,0,1,0,0},
 			atkfreq=50
 		},
@@ -917,10 +949,10 @@ function init_waves()
 		},
 		{
 			--wave 4
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,0,5,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
 			atkfreq=30
 		},
 	}
