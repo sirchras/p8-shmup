@@ -15,6 +15,8 @@ do
 		--load start screen
 		startscrn()
 --		setbtnpdelay()
+		--debug
+--		frame=0
 	end
 
 	function _update()
@@ -32,6 +34,8 @@ do
 			end
 		end
 		update[state]()
+		--debug
+--		frame+=1
 	end
 
 	function _draw()
@@ -50,6 +54,7 @@ do
 --		print("♥",0,12,2) --7x5 px
 		--debug time
 		print(flr(time()),0,120,7)
+		print(flr(time()*30),16,120,7)
 		--debug game objs and fx
 		if (bullets) print(#bullets,0,112,8)
 		if (enemies) print(#enemies,0,104,11)
@@ -183,13 +188,13 @@ function update_game()
 		end
 	end
 	--select enemy to attack
-	local fr=time()*30
+	local fr=ceil(time()*30) --idk why ceil works here but flr doesn't
 	if #enemies>0 and fr%atkfreq==0 then
 		local e=selectenemy()
 		if e and e.act==e.hold then
 			e.act=e.atk
 			--debug
---			e.frame=fr
+			e.frame=fr
 		end
 	end
 	--anim fx
@@ -776,7 +781,7 @@ function enemy:draw()
 --	local adv=(self.act==self.adv)
 --	local hold=(self.act==self.hold)
 --	print(hold and "y" or "n",self.x,self.y+8,8)
---	if (self.frame) print(self.frame,self.x,self.y+8,8)
+	if (self.frame) print(self.frame,self.x,self.y+8,8)
 --	if (self.act==self.atk) print(self.dx,self.x,self.y+8,8)
 end
 function enemy:flash()
@@ -825,8 +830,10 @@ green=enemy:new{
 --end
 function green:atk()
 --	local dx=sin(time()*30/20)
-	local d,dx=p.x-self.x
-	dx=sgn(d)*min(abs(d),20)/30
+	local d,dx=p.x-self.x,0
+	if self.y<p.y then
+		dx=sgn(d)*min(abs(d),20)/30
+	end
 	dx+=sin(time()*30/20)
 --	self.dx=dx --dbugging
 	local dy=1
