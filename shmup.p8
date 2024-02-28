@@ -148,6 +148,7 @@ function startgame()
 	--enemies
 	enemies={}
 	atkfreq=waves[wave].atkfreq
+	firenext=ceil(time()*30)+atkfreq
 	--fx
 --	effects={} --sprite effects
 	pfx={} --particles
@@ -187,14 +188,23 @@ function update_game()
 	end
 	--select enemy to attack
 	local fr=ceil(time()*30) --idk why ceil works here but flr doesn't
-	if #enemies>0 and fr%atkfreq==0 then
-		local e=selectenemy()
-		if e and e.act==e.hold then
-			e.wait=30
-			e.shke=30
-			e.act=e.atk
-			--debug
---			e.frame=fr
+	if #enemies>0 then
+		if fr>firenext then
+			local e=selectenemy()
+			if e and e.act==e.hold then
+					e:fire()
+					firenext=fr+20+rnd(20)
+			end
+		end
+		if fr%atkfreq==0 then
+			local e=selectenemy()
+			if e and e.act==e.hold then
+				e.wait=30
+				e.shke=30
+				e.act=e.atk
+				--debug
+--				e.frame=fr
+			end
 		end
 	end
 	--anim fx
@@ -502,7 +512,6 @@ function gmobj:draw()
 	spr(self.sp,self.x,self.y,
 		self.spx,self.spy)
 end
---should this be on this class?
 function gmobj:move(dx,dy)
 	--todo
 	local dx=dx or 0
@@ -512,12 +521,18 @@ function gmobj:move(dx,dy)
 end
 --collisions (square)
 function gmobj:col(obj)
-	local sw,sh=(8*self.spx)-1,(8*self.spy)-1
-	local ow,oh=(8*obj.spx)-1,(8*obj.spy)-1
-	local sx1,ox1=self.x,obj.x
-	local sx2,ox2=sx1+sw,ox1+ow
-	local sy1,oy1=self.y,obj.y
-	local sy2,oy2=sy1+sh,oy1+oh
+	local sw=self.colw or (8*self.spx)
+	local sh=self.colh or (8*self.spy)
+	local ow=obj.colw or (8*obj.spx)
+	local oh=obj.colh or (8*obj.spy)
+	local sxoff=self.colxoff or 0
+	local oxoff=obj.colxoff or 0
+	local sx1,ox1=self.x+sxoff,obj.x+oxoff
+	local sx2,ox2=sx1+sw-1,ox1+ow-1
+	local syoff=self.colyoff or 0
+	local oyoff=self.colyoff or 0
+	local sy1,oy1=self.y+syoff,obj.y+oyoff
+	local sy2,oy2=sy1+sh-1,oy1+oh-1
 	--if obj to the right, left,
 	-- above, or below:
 	if sx2<ox1 or ox2<sx1 or
@@ -527,6 +542,17 @@ function gmobj:col(obj)
 	end
 	--otherwise: collision
 	return true
+end
+--update the gmobj sprite
+-- requires array of frames
+function gmobj:anim()
+	local i=self.fr_i
+	i+=self.fr_s
+	if flr(i)>#self.fr then
+		i=1
+	end
+	self.sp=self.fr[flr(i)]
+	self.fr_i=i
 end
 
 --particle class
@@ -707,7 +733,6 @@ function bullet:update()
 	for i=#enemies,1,-1 do
 		local e=enemies[i]
 		if self:col(e) then
-			--todo: enemy bullets
 			e.♥-=1
 			e.flsh=4
 			spawnimpact(self.x+4,
@@ -718,15 +743,46 @@ function bullet:update()
 				--create explosion fx
 				spawnexplosion(e.x+4,e.y+4,
 					"green")
+				if e.act==e.atk then
+					--select new enemy to atk
+					local ne=selectenemy()
+					if ne and rnd()>=.5 then
+						ne.act=ne.atk
+					end
+				end
 				--delete the dead enemy
 				deli(enemies,i)
 				--score,sfx feedback
 				sfx(2)
 				score+=10
-				--spawn new enemy
---				spawnenemy()
 			end
 		end
+	end
+end
+
+--enemy bullet
+ebullet=gmobj:new{
+	sp=29,
+	fr={29,30,31},
+	fr_i=1,
+	fr_s=0.4,
+	dx=0,
+	dy=0,
+	colw=2, --collider width
+	colh=2, --collider height
+	colxoff=2, --collider x offset
+	colyoff=2, --collider y offset
+}
+function ebullet:update()
+	self:move(self.dx,self.dy)
+	self:anim()
+	if self:col(p) and
+	   p.invul==0 then
+		--spawn explosion fx,sfx
+		spawnexplosion(p.x+4,p.y+4)
+		sfx(1)
+		p.♥-=1
+		p.invul=60
 	end
 end
 -->8
@@ -735,6 +791,9 @@ end
 --enemy class
 enemy=gmobj:new{
 	sp=32, --enemy sprite
+	fr={32,33,32,35}, --anim frames
+	fr_i=1, --current anim frame
+	fr_s=0.4, --anim speed
 	♥=3, --enemy health
 	flsh=0,--dmg flash
 	act=nil, --current action: adv,hold,atk
@@ -742,7 +801,7 @@ enemy=gmobj:new{
 	ty=0, --target y position
 	wait=0, --wait before active
 	shke=0, --shake
-	s=1, --default speed
+	s=1, --default mv speed
 }
 function enemy:update()
 	if (self.shke>0) self.shke-=1
@@ -750,6 +809,11 @@ function enemy:update()
 		self.wait-=1
 		return
 	end
+	--dcrm dmg flash
+	if (self.flsh>0) self.flsh-=1
+	--anim
+	self:anim()
+	--enemy state - action
 	if (not self.act) self.act=self.adv
 	self:act()
 --	self.y+=1
@@ -763,10 +827,6 @@ function enemy:update()
 		p.♥-=1
 		p.invul=60
 	end
-	--dcrm dmg flash
-	if (self.flsh>0) self.flsh-=1
-	--anim
-	self:anim()
 end
 function enemy:draw()
 	--manipulate palette to flash
@@ -781,7 +841,7 @@ function enemy:draw()
 		spy=self.spy
 	}
 	if (self.shke>0) then
-		obj.x+=sin(time()*30/3)
+		obj.x+=sin(time()*30/4)
 	end
 	--call parent draw fn
 	gmobj.draw(obj)
@@ -802,10 +862,14 @@ function enemy:flash()
 		pal(i,7)
 	end
 end
---update the enemy sprite
-function enemy:anim()
-	self.sp+=0.4
-	if (self.sp>=36) self.sp=32
+function enemy:fire()
+	--spawn new bullet
+	add(bullets,ebullet:new{
+		x=self.x+1,
+		y=self.y+6,
+		dy=2
+	})
+	sfx(29)
 end
 --enemy behavior: advance
 function enemy:adv()
@@ -843,6 +907,7 @@ function green:atk()
 		dx=sgn(d)*min(abs(d),20)/30
 	end
 	dx+=sin(time()*30/20)
+--	dx+=sin(flr(time()*30)%30/30)
 	local dy=1
 	self:move(dx,dy)
 	self.x=mid(0,self.x,120)
@@ -852,13 +917,10 @@ end
 spinner=enemy:new{
 	typ="spinner",
 	sp=120, --120-123
+	fr={120,121,122,123},
 	dx=0,
 --	♥=5,
 }
-function spinner:anim()
-	self.sp+=0.4
-	if (self.sp>=124) self.sp=120
-end
 function spinner:atk()
 	local dy=0
 	if self.dx==0 then
@@ -877,23 +939,22 @@ end
 jelly=enemy:new{
 	typ="jelly",
 	sp=101, --101-104
+	fr={101,102,103,104},
 	♥=2,
 }
-function jelly:anim()
-	self.sp+=0.4
-	if (self.sp>=105) self.sp=101
+function jelly:atk()
+	--todo
+	enemy.atk(self)
 end
 
 --red
 red=enemy:new{
 	typ="red",
 	sp=84, --84-85
+	fr={84,85},
+	fr_s=0.2, --anim speed
 	♥=2,
 }
-function red:anim()
-	self.sp+=0.2
-	if (self.sp>=86) self.sp=84
-end
 function red:atk()
 	local dx=sin(time()*30/20)
 	local dy=2.5
@@ -905,20 +966,13 @@ end
 --golden bug?
 bb=enemy:new{
 	sp=144, --144,146
+	fr={144,146},
+	fr_s=0.2, --anim speed
 	♥=10,
 	spx=2, --sprite width
 	spy=2, --sprite height
 	s=0.5,
 }
-do
-	local i=1
-	local fr={144,146}
-	function bb:anim()
-		i+=0.2
-		if (flr(i)>#fr) i=1
-		self.sp=fr[flr(i)]
-	end
-end
 -->8
 --waves
 function init_waves()
@@ -966,12 +1020,12 @@ __gfx__
 007007000211882028811882028811200000000000000000000990000000000000000000000000000008000000080000000800009aa77aa909aaaa9000099000
 00000000025d820028d55d820028d52000000000000000000000000000000000000000000000000000000000000000000000000009aaaa900099990000000000
 00000000029d200002d99d200002d920000000000000000000000000000000000000000000000000000000000000000000000000009999000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000000000000000000000000000000000000077000000770000007700000c77c0000077000000000000000000000000000000000000000000000000000
-00099000000dd00000022000000330000001100000c77c000007700000c77c000cccccc000c77c00000000000000000000000000000000000000000000000000
-0097a90000d7cd00002782000037b3000017c10000cccc00000cc00000cccc0000cccc0000cccc00000000000000000000000000000000000000000000000000
-009aa90000dccd0000288200003bb300001cc100000cc000000cc000000cc00000000000000cc000000000000000000000000000000000000000000000000000
-00099000000dd00000022000000330000001100000000000000cc000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ee000000ee000000770000
+000000000000000000000000000000000000000000077000000770000007700000c77c00000770000000000000000000000000000e22e0000e88e00007dd7000
+00099000000dd00000022000000330000001100000c77c000007700000c77c000cccccc000c77c00000000000000000000000000e2e82e00e87e8e007d77d700
+0097a90000d7cd00002782000037b3000017c10000cccc00000cc00000cccc0000cccc0000cccc00000000000000000000000000e2882e00e8ee8e007d77d700
+009aa90000dccd0000288200003bb300001cc100000cc000000cc000000cc00000000000000cc0000000000000000000000000000e22e0000e88e00007dd7000
+00099000000dd00000022000000330000001100000000000000cc00000000000000000000000000000000000000000000000000000ee000000ee000000770000
 00090000000d00000002000000030000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 03300330033003300330033003300330000000000330033000000000000000000000000000000000000000500000000000000050000000000000000000000000
@@ -1074,6 +1128,8 @@ __sfx__
 510c0000143151931520325143251931520315163251932516315183151932516325183151931516325183251b3151e315183251b3251e315183151b3251e325183151b3151d325183251b3151d315183251b325
 010c00000175001750017500175001750017500175001750037500375003750037500375003750037500375006750067500675006750067500675006750067500575005750057500575005750057500575005750
 010c00001d55024500245001b55519555245001e550245002450029500165502450024500245001e550245001e55024500245001d5551b555245001d5502450024500295001855024500275002a5002950028500
+480200001735005300113400b32009320073200735000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+480200001735005300113400b32009320073200735000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __music__
 04 04050644
 00 07084749
