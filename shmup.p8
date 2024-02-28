@@ -15,6 +15,8 @@ do
 		--load start screen
 		startscrn()
 --		setbtnpdelay()
+		--debug
+--		frame=0
 	end
 
 	function _update()
@@ -32,6 +34,8 @@ do
 			end
 		end
 		update[state]()
+		--debug
+--		frame+=1
 	end
 
 	function _draw()
@@ -50,6 +54,7 @@ do
 --		print("♥",0,12,2) --7x5 px
 		--debug time
 		print(flr(time()),0,120,7)
+		print(flr(time()*30),16,120,7)
 		--debug game objs and fx
 		if (bullets) print(#bullets,0,112,8)
 		if (enemies) print(#enemies,0,104,11)
@@ -132,6 +137,7 @@ function startgame()
 	music(0)
 	--set score,wave
 	score=0
+	waves=init_waves()
 	wave=1
 	wvt=60 --wave timer
 	--player
@@ -141,7 +147,8 @@ function startgame()
 	m_flsh=0
 	--enemies
 	enemies={}
---	spawnenemies(2)
+	atkfreq=waves[wave].atkfreq
+	firenext=ceil(time()*30)+atkfreq
 	--fx
 --	effects={} --sprite effects
 	pfx={} --particles
@@ -157,21 +164,8 @@ function update_game()
 	end
 	--check if wave defeated
 	if #enemies==0 and wvt==0 then
-		wave+=1
-		--check if defeated all waves?
-		if wave>4 then
-			if not isstatetrans() then
-				--don't like how nested it is
-				gameover(true)
-			end
-		else
-			wvt=60
-			--play music
-			music(3)
-		end
+		nextwave()
 	end
-	--test, remove later
-	if (btnp(🅾️)) setstate("over") wvt=0
 	--move player
 	if (p.♥>0) p:update()
 	--move bullets
@@ -187,11 +181,30 @@ function update_game()
 	for e in all(enemies) do
 		e:update()
 		--rm offscreen enemies
-		if e.y>128 then
-			del(enemies,e)
-			--respawn enemy of same type
-			-- also retains prev dmg
---			spawnenemy(e)
+		if e.y>128 or
+		   e.x<-8 or e.x>128 then
+			if (e.act==e.atk) del(enemies,e)
+		end
+	end
+	--select enemy to attack
+	local fr=ceil(time()*30) --idk why ceil works here but flr doesn't
+	if #enemies>0 then
+		if fr>firenext then
+			local e=selectenemy()
+			if e and e.act==e.hold then
+					e:fire()
+					firenext=fr+20+rnd(20)
+			end
+		end
+		if fr%atkfreq==0 then
+			local e=selectenemy()
+			if e and e.act==e.hold then
+				e.wait=30
+				e.shke=30
+				e.act=e.atk
+				--debug
+--				e.frame=fr
+			end
 		end
 	end
 	--anim fx
@@ -237,18 +250,33 @@ function draw_game()
 	end
 end
 
+--next wave
+function nextwave()
+	--do nothing if state trans
+	if (isstatetrans()) return
+	--get next wave if more waves
+	if wave<#waves then
+		--inc wave count
+		wave+=1
+		--update enemy atkfreq
+		atkfreq=waves[wave].atkfreq
+		wvt=60
+		--play wave music
+		music(3)
+		return
+	end
+	--if no more waves, gameover
+	gameover(true)
+end
+
 --spawn wave
 function spawnwave(wave)
-	--temp logic to spawn 1 type
-	-- per wave
-	local wvlt={
-		jelly,
-		green,
-		spinner
-	}
-	local etyp=(wave<=#wvlt) and wvlt[wave] or boss
-	local n=(wave<=3) and 3 or 1
-	spawnenemies(n,etyp)
+	local y=-8
+	local wave=waves[wave]
+	for i=1,#wave do
+		local row=wave[i]
+		spawnenemies(row,#wave-i)
+	end
 end
 
 --incoming wave text
@@ -262,28 +290,62 @@ do
 	end
 end
 
---spawn enemy
-do
-	local rtyp=function()
-		--local enemy type lookup
-		local typ={green,spinner,
-			jelly,boss}
-		local i=1+flr(rnd(#typ))
-		return typ[i]
-	end
-	function spawnenemies(n,typ)
-		for i=1,n do
-			local et=typ or rtyp()
-			local e=et:new{
-				x=rnd(120), --random x pos
-				y=-8 --offscreen (above)
-			}
-			add(enemies,e)
-		end
+--spawn a row of enemies
+-- this is a math nightmare
+-- and prob should be fixed
+function spawnenemies(row,i)
+	local x,y=6,-10*(i+1)
+	local etyp={green,spinner,
+		jelly,red,bb}
+	for i=1,#row do
+		local et,e,x0=etyp[row[i]]
+		if (not et) goto nxt
+		x0=64+24*(i-(#row/2)-0.5)
+		e=spawnenemy(et,x0,y)
+		--perhaps vectors?
+		e.tx,e.ty=x,y+56
+		--this could use trig if i felt extra
+--		e.wait=i*3
+		e.wait=abs(i-(#row/2)-0.5)*3
+--		e.wait=(5-abs(i-(#row/2)-0.5))*3
+		::nxt::
+		x+=(e and e.spx*8 or 8)+4
 	end
 end
-spawnenemy=function(typ)
-	spawnenemies(1,typ)
+
+function spawnenemy(typ,x,y)
+	local e=typ:new{
+		x=x or rnd(120),
+		y=y or -8,
+	}
+	add(enemies,e)
+	return e
+end
+
+--select available enemy to atk
+-- bias towards front
+--fn might be doing too much...
+function selectenemy()
+--	local e=rnd(enemies)
+	local r=#enemies%10
+	local n=r==0 and 10 or r
+	local i=#enemies-n+1
+	--get vanguard of formation
+	local tbl={
+		unpack(enemies,i,#enemies)
+	}
+	--filter out busy enemies
+	for e in all(tbl) do
+		if (e.act!=e.hold) del(tbl,e)
+	end
+	if (#tbl>0) return rnd(tbl)
+	--select from behind vanguard
+	i-=1+flr(rnd(10))
+	if i>0 then
+		local e=enemies[i]
+		if (e.act==e.hold) return e
+	end
+	return nil
 end
 
 --spawn explosion pfx
@@ -450,17 +512,26 @@ function gmobj:draw()
 	spr(self.sp,self.x,self.y,
 		self.spx,self.spy)
 end
+function gmobj:move(dx,dy)
+	--todo
+	local dx=dx or 0
+	local dy=dy or 0
+	self.x+=dx
+	self.y+=dy
+end
 --collisions (square)
 function gmobj:col(obj)
-	--add optional width/height
-	-- prop to object collision?
-	local sw=self.w or 8*self.spx
-	local sh=self.h or 8*self.spy
-	local ow=obj.w or 8*obj.spx
-	local oh=obj.h or 8*obj.spy
-	local sx1,ox1=self.x,obj.x
+	local sw=self.colw or 8*self.spx
+	local sh=self.colh or 8*self.spy
+	local ow=obj.colw or 8*obj.spx
+	local oh=obj.colh or 8*obj.spy
+	local sxoff=self.colxoff or 0
+	local oxoff=obj.colxoff or 0
+	local sx1,ox1=self.x+sxoff,obj.x+oxoff
 	local sx2,ox2=sx1+sw-1,ox1+ow-1
-	local sy1,oy1=self.y,obj.y
+	local syoff=self.colyoff or 0
+	local oyoff=self.colyoff or 0
+	local sy1,oy1=self.y+syoff,obj.y+oyoff
 	local sy2,oy2=sy1+sh-1,oy1+oh-1
 	--if obj to the right, left,
 	-- above, or below:
@@ -471,6 +542,17 @@ function gmobj:col(obj)
 	end
 	--otherwise: collision
 	return true
+end
+--update the gmobj sprite
+-- requires array of frames
+function gmobj:anim()
+	local i=self.fr_i
+	i+=self.fr_s
+	if flr(i)>#self.fr then
+		i=1
+	end
+	self.sp=self.fr[flr(i)]
+	self.fr_i=i
 end
 
 --particle class
@@ -579,7 +661,7 @@ player=gmobj:new{
 }
 function player:update()
 	local sp=2 --default sprite
-	local x,y=self.x,self.y
+	local s=self.s
 	local dx,dy=0,0
 	--btn input
 	--⬆️⬇️⬅️➡️❎
@@ -589,13 +671,16 @@ function player:update()
 	if btn(➡️) then
 		dx,sp=self.s,3
 	end
-	if btn(⬆️) then dy=-self.s end
-	if btn(⬇️) then dy=self.s end
+	if (btn(⬆️)) dy=-self.s
+	if (btn(⬇️)) dy=self.s
 --	if btn(❎) and self.fc<=0 then
 	if btnp(❎) then
 		--spawn new bullet
-		b=bullet:new{x=x+1,y=y-6,dy=-2}
-		add(bullets,b)
+		add(bullets,bullet:new{
+			x=self.x,
+			y=self.y-6,
+			dy=-2
+		})
 		--reset fire cooldown
 		self.fc=self.fr
 		--set muzzle flash
@@ -604,8 +689,9 @@ function player:update()
 		sfx(0)
 	end
 	--move/update player
-	self.x=mid(0,x+dx,120)
-	self.y=mid(0,y+dy,120)
+	self:move(dx,dy)
+	self.x=mid(0,self.x,120)
+	self.y=mid(0,self.y,120)
 	self.sp=sp
 	--decrm iframes
 	if (self.invul>0) self.invul-=1
@@ -639,19 +725,15 @@ end
 
 --bullet class
 bullet=gmobj:new{
-	sp=29, --bullet sprite
+	sp=14, --bullet sprite
 	dx=0, --x velocity
 	dy=0, --y velocity
-	w=6, --width
-	h=6, --height
 }
 function bullet:update()
-	self.x+=self.dx
-	self.y+=self.dy
+	self:move(self.dx,self.dy)
 	for i=#enemies,1,-1 do
 		local e=enemies[i]
 		if self:col(e) then
-			--todo: enemy bullets
 			e.♥-=1
 			e.flsh=4
 			spawnimpact(self.x+4,
@@ -662,15 +744,46 @@ function bullet:update()
 				--create explosion fx
 				spawnexplosion(e.x+4,e.y+4,
 					"green")
+				if e.act==e.atk then
+					--select new enemy to atk
+					local ne=selectenemy()
+					if ne and rnd()>=.5 then
+						ne.act=ne.atk
+					end
+				end
 				--delete the dead enemy
 				deli(enemies,i)
 				--score,sfx feedback
 				sfx(2)
 				score+=10
-				--spawn new enemy
---				spawnenemy()
 			end
 		end
+	end
+end
+
+--enemy bullet
+ebullet=gmobj:new{
+	sp=29,
+	fr={29,30,31},
+	fr_i=1,
+	fr_s=0.4,
+	dx=0,
+	dy=0,
+	colw=2, --collider width
+	colh=2, --collider height
+	colxoff=2, --collider x offset
+	colyoff=2, --collider y offset
+}
+function ebullet:update()
+	self:move(self.dx,self.dy)
+	self:anim()
+	if self:col(p) and
+	   p.invul==0 then
+		--spawn explosion fx,sfx
+		spawnexplosion(p.x+4,p.y+4)
+		sfx(1)
+		p.♥-=1
+		p.invul=60
 	end
 end
 -->8
@@ -679,11 +792,32 @@ end
 --enemy class
 enemy=gmobj:new{
 	sp=32, --enemy sprite
-	♥=5, --enemy health
-	flsh=0 --dmg flash
+	fr={32,33,32,35}, --anim frames
+	fr_i=1, --current anim frame
+	fr_s=0.4, --anim speed
+	♥=3, --enemy health
+	flsh=0,--dmg flash
+	act=nil, --current action: adv,hold,atk
+	tx=0, --target x position
+	ty=0, --target y position
+	wait=0, --wait before active
+	shke=0, --shake
+	s=1, --default mv speed
 }
 function enemy:update()
-	self.y+=1
+	if (self.shke>0) self.shke-=1
+	if self.wait>0 then
+		self.wait-=1
+		return
+	end
+	--dcrm dmg flash
+	if (self.flsh>0) self.flsh-=1
+	--anim
+	self:anim()
+	--enemy state - action
+	if (not self.act) self.act=self.adv
+	self:act()
+--	self.y+=1
 	--check enemy/player collision
 	if self:col(p) and
 	   p.invul==0 then
@@ -694,88 +828,189 @@ function enemy:update()
 		p.♥-=1
 		p.invul=60
 	end
-	--dcrm dmg flash
-	if (self.flsh>0) self.flsh-=1
-	--anim
-	self:anim()
 end
 function enemy:draw()
 	--manipulate palette to flash
 	-- when taking damage
 	if (self.flsh>0) self:flash()
+	--cpy to prevent mutation
+	local obj={
+		x=self.x,
+		y=self.y,
+		sp=self.sp,
+		spx=self.spx,
+		spy=self.spy
+	}
+	if (self.shke>0) then
+		obj.x+=sin(time()*30/4)
+	end
 	--call parent draw fn
-	gmobj.draw(self)
+	gmobj.draw(obj)
 	pal() --reset palette
 	--debug
---	print(self.flsh,self.x,self.y+8,8)
+--	print(self.y,self.x,self.y+8,8)
+--	if (self.wait) print(self.wait,self.x,self.y+8,8)
+--	local atk=(self.act==self.atk)
+--	local adv=(self.act==self.adv)
+--	local hold=(self.act==self.hold)
+--	print(hold and "y" or "n",self.x,self.y+8,8)
+--	if (self.frame) print(self.frame,self.x,self.y+8,8)
+--	if (self.act==self.atk) print(self.dx,self.x,self.y+8,8)
 end
 function enemy:flash()
-	--kinda color invert
-	pal(1,8) --d blue to brwn
-	pal(3,2) --d grn to purple
-	pal(7,0) --white to blck
-	pal(11,14) --l grn to pink
+	--flash white on dmg
+	for i=1,15 do
+		pal(i,7)
+	end
 end
---update the enemy sprite
-function enemy:anim()
-	self.sp+=0.4
-	if (self.sp>=36) self.sp=32
+function enemy:fire()
+	--spawn new bullet
+	add(bullets,ebullet:new{
+		x=self.x+1,
+		y=self.y+6,
+		dy=2
+	})
+	sfx(29)
 end
---alt name for default enemy
-green=enemy
+--enemy behavior: advance
+function enemy:adv()
+	local dx=(self.tx-self.x)/8
+	local dy=(self.ty-self.y)/8
+	if abs(self.y-self.ty)<0.5 then
+		self.y=self.ty
+		self.x=self.tx
+		self.act=self.hold
+	end
+	self:move(dx,dy)
+end
+function enemy:hold()
+	--do something?
+end
+function enemy:atk()
+	--attack
+	self:move(0,self.s)
+end
+
+--default green enemy
+green=enemy:new{
+	typ="green",
+}
+--function green:flash()
+--	--kinda color invert
+--	pal(1,8) --d blue to brwn
+--	pal(3,2) --d grn to purple
+--	pal(7,0) --white to blck
+--	pal(11,14) --l grn to pink
+--end
+function green:atk()
+	local d,dx=p.x-self.x,0
+	if self.y<p.y then
+		dx=sgn(d)*min(abs(d),20)/30
+	end
+	dx+=sin(time()*30/20)
+--	dx+=sin(flr(time()*30)%30/30)
+	local dy=1
+	self:move(dx,dy)
+	self.x=mid(0,self.x,120)
+end
 
 --spinner enemy
 spinner=enemy:new{
+	typ="spinner",
 	sp=120, --120-123
+	fr={120,121,122,123},
+	dx=0,
 --	♥=5,
 }
---possibly a better way
-function spinner:flash()
-	pal() --do nothing
-end
-function spinner:anim()
-	self.sp+=0.4
-	if (self.sp>=124) self.sp=120
+function spinner:atk()
+	local dy=0
+	if self.dx==0 then
+		if p.y<=self.y then
+			--mv horizontally
+			self.dx=sgn(p.x-self.x)*2
+		else
+			--continue vertically
+			dy=1
+		end
+	end
+	self:move(self.dx,dy)
 end
 
 --jellyfish enemy
 jelly=enemy:new{
+	typ="jelly",
 	sp=101, --101-104
+	fr={101,102,103,104},
 	♥=2,
 }
-function jelly:flash()
-	pal() --do nothing
-end
-function jelly:anim()
-	self.sp+=0.4
-	if (self.sp>=105) self.sp=101
+function jelly:atk()
+	--todo
+	enemy.atk(self)
 end
 
---boss
-boss=enemy:new{
+--red
+red=enemy:new{
+	typ="red",
+	sp=84, --84-85
+	fr={84,85},
+	fr_s=0.2, --anim speed
+	♥=2,
+}
+function red:atk()
+	local dx=sin(time()*30/20)
+	local dy=2.5
+	self:move(dx,dy)
+	self.x=mid(0,self.x,120)
+end
+
+--todo: change name
+--golden bug?
+bb=enemy:new{
 	sp=144, --144,146
+	fr={144,146},
+	fr_s=0.2, --anim speed
 	♥=10,
 	spx=2, --sprite width
 	spy=2, --sprite height
+	s=0.5,
 }
-function boss:flash()
-	pal() --do nothing
-end
-do
-	local i=1
-	local fr={144,146}
-	function boss:anim()
-		i+=0.2
-		if (flr(i)>#fr) i=1
-		self.sp=fr[flr(i)]
-	end
---	function boss:draw()
---		--call to parent draw
---		enemy.draw(self)
---		--debug
---		print(self.sp,self.x,self.y,8)
---		print(i,self.x,self.y+6,8)
---	end
+-->8
+--waves
+function init_waves()
+	return {
+		{
+			--wave 1
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			atkfreq=60
+		},
+		{
+			--wave 2
+			{0,0,1,0,1,1,0,1,0,0},
+			{2,1,0,1,4,4,1,0,1,3},
+			{3,1,0,1,4,4,1,0,1,2},
+			{0,0,1,0,1,1,0,1,0,0},
+			atkfreq=50
+		},
+		{
+			--wave 3
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			atkfreq=40
+		},
+		{
+			--wave 4
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,0,5,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
+			atkfreq=30
+		},
+	}
 end
 __gfx__
 00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
@@ -786,12 +1021,12 @@ __gfx__
 007007000211882028811882028811200000000000000000000990000000000000000000000000000008000000080000000800009aa77aa909aaaa9000099000
 00000000025d820028d55d820028d52000000000000000000000000000000000000000000000000000000000000000000000000009aaaa900099990000000000
 00000000029d200002d99d200002d920000000000000000000000000000000000000000000000000000000000000000000000000009999000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000099990000000000000000000
-000000000000000000000000000000000000000000077000000770000007700000c77c000007700000000000000000000000000099aa99000000000000000000
-00099000000dd00000022000000330000001100000c77c000007700000c77c000cccccc000c77c000000000000000000000000009a77a9000000000000000000
-0097a90000d7cd00002782000037b3000017c10000cccc00000cc00000cccc0000cccc0000cccc000000000000000000000000009a77a9000000000000000000
-009aa90000dccd0000288200003bb300001cc100000cc000000cc000000cc00000000000000cc00000000000000000000000000009aa90000000000000000000
-00099000000dd00000022000000330000001100000000000000cc000000000000000000000000000000000000000000000000000009900000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ee000000ee000000770000
+000000000000000000000000000000000000000000077000000770000007700000c77c00000770000000000000000000000000000e22e0000e88e00007dd7000
+00099000000dd00000022000000330000001100000c77c000007700000c77c000cccccc000c77c00000000000000000000000000e2e82e00e87e8e007d77d700
+0097a90000d7cd00002782000037b3000017c10000cccc00000cc00000cccc0000cccc0000cccc00000000000000000000000000e2882e00e8ee8e007d77d700
+009aa90000dccd0000288200003bb300001cc100000cc000000cc000000cc00000000000000cc0000000000000000000000000000e22e0000e88e00007dd7000
+00099000000dd00000022000000330000001100000000000000cc00000000000000000000000000000000000000000000000000000ee000000ee000000770000
 00090000000d00000002000000030000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 03300330033003300330033003300330000000000330033000000000000000000000000000000000000000500000000000000050000000000000000000000000
@@ -894,6 +1129,8 @@ __sfx__
 510c0000143151931520325143251931520315163251932516315183151932516325183151931516325183251b3151e315183251b3251e315183151b3251e325183151b3151d325183251b3151d315183251b325
 010c00000175001750017500175001750017500175001750037500375003750037500375003750037500375006750067500675006750067500675006750067500575005750057500575005750057500575005750
 010c00001d55024500245001b55519555245001e550245002450029500165502450024500245001e550245001e55024500245001d5551b555245001d5502450024500295001855024500275002a5002950028500
+480200001735005300113400b32009320073200735000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+480200001735005300113400b32009320073200735000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __music__
 04 04050644
 00 07084749
@@ -905,4 +1142,3 @@ __music__
 01 12131415
 00 16131417
 02 18191a1b
-
