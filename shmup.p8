@@ -15,6 +15,7 @@ do
 		--load start screen
 		startscrn()
 --		setbtnpdelay()
+		shake=0
 		--debug
 --		frame=0
 	end
@@ -44,6 +45,7 @@ do
 			game=draw_game,
 			over=draw_over,
 		}
+		if (shake>0) scrnshake()
 		draw[state]()
 		--debug layout/ui
 --		line(0,0,0,127,5)
@@ -99,6 +101,18 @@ function blink(c1,c2)
 	return function()
 		local n=ceil(sin(time()))
 		return n==1 and c1 or c2
+	end
+end
+
+function scrnshake()
+	local offx=rnd(shake)-shake/2
+	local offy=rnd(shake)-shake/2
+	camera(offx,offy)
+	if shake>10 then
+		shake*=0.9
+	else
+		shake-=1
+		if (shake<1) shake=0
 	end
 end
 -->8
@@ -195,8 +209,14 @@ function update_game()
 		if fr>firenext then
 			local e=selectenemy()
 			if e and e.act==e.hold then
+				if e.typ=="bb" then
+					e:firespread(8)
+				elseif e.typ=="red" then
+					e:fireaimed(p)
+				else
 					e:fire()
-					firenext=fr+20+rnd(20)
+				end
+				firenext=fr+20+rnd(20)
 			end
 		end
 		if fr%atkfreq==0 then
@@ -522,12 +542,22 @@ function gmobj:move(dx,dy)
 	self.x+=dx
 	self.y+=dy
 end
+--get width
+function gmobj:w()
+	local w=self._w or 8*self.spx
+	return w
+end
+--get height
+function gmobj:h()
+	local h=self._h or 8*self.spy
+	return h
+end
 --collisions (square)
 function gmobj:col(obj)
-	local sw=self.colw or 8*self.spx
-	local sh=self.colh or 8*self.spy
-	local ow=obj.colw or 8*obj.spx
-	local oh=obj.colh or 8*obj.spy
+	local sw=self.colw or self:w()
+	local sh=self.colh or self:h()
+	local ow=obj.colw or obj:w()
+	local oh=obj.colh or obj:h()
 	local sxoff=self.colxoff or 0
 	local oxoff=obj.colxoff or 0
 	local sx1,ox1=self.x+sxoff,obj.x+oxoff
@@ -772,6 +802,8 @@ ebullet=gmobj:new{
 	fr_s=0.4,
 	dx=0,
 	dy=0,
+	_w=6, --sprite width
+	_h=6, --sprite height
 	colw=2, --collider width
 	colh=2, --collider height
 	colxoff=2, --collider x offset
@@ -780,8 +812,11 @@ ebullet=gmobj:new{
 function ebullet:update()
 	self:move(self.dx,self.dy)
 	self:anim()
+	--todo: move player collison
+	-- code elsewhere
 	if self:col(p) and
 	   p.invul==0 then
+		shake=12
 		--spawn explosion fx,sfx
 		spawnexplosion(p.x+4,p.y+4)
 		sfx(1)
@@ -789,6 +824,7 @@ function ebullet:update()
 		p.invul=60
 	end
 end
+
 -->8
 --classes: enemies
 
@@ -821,9 +857,12 @@ function enemy:update()
 	if (not self.act) self.act=self.adv
 	self:act()
 --	self.y+=1
+	--todo: move player collison
+	-- code elsewhere
 	--check enemy/player collision
 	if self:col(p) and
 	   p.invul==0 then
+		shake=12
 		--spawn explosion fx,sfx
 		spawnexplosion(p.x+4,p.y+4)
 		sfx(1)
@@ -866,14 +905,45 @@ function enemy:flash()
 		pal(i,7)
 	end
 end
-function enemy:fire()
-	--spawn new bullet
-	add(bullets,ebullet:new{
-		x=self.x+1,
-		y=self.y+6,
-		dy=2
-	})
+--todo: make class agnostic?
+function enemy:fire(ang,spd)
+	local ang=ang or 0
+	local spd=spd or 2
+--	local spd=0.2
+	local b=ebullet
 	sfx(29)
+	--spawn new bullet
+	return add(bullets,b:new{
+		--mathematically correct,
+		-- but looks like a lot
+		-- simplify?
+		x=self.x+(self:w()-b:w())/2+(sin(ang)*(self:w()+b:w())/2),
+		y=self.y+(self:h()-b:h())/2+(cos(ang)*(self:h()+b:h())/2),
+		dx=spd*sin(ang),
+		dy=spd*cos(ang)
+	})
+end
+--todo: make class agnostic?
+function enemy:firespread(n,ang,spd)
+	local ang=ang or 0
+	local spd=spd or 2
+	for i=1,n do
+		self:fire(ang+i/n,spd)
+	end
+end
+--todo: make class agnostic?
+function enemy:fireaimed(t,spd)
+	local t=t or p --default player
+	local spd=spd or 2
+--	local spd=0.2
+	local b=self:fire()
+	local dy=t.y-b.y+(t:h()-b:h())/2
+	local dx=t.x-b.x+(t:w()-b:w())/2
+	local ang=atan2(dy,dx)
+	b.dx=spd*sin(ang)
+	b.dy=spd*cos(ang)
+	--debug
+--	b.ang=ang
 end
 --enemy behavior: advance
 function enemy:adv()
@@ -969,6 +1039,7 @@ end
 --todo: change name
 --golden bug?
 bb=enemy:new{
+	typ="bb",
 	sp=144, --144,146
 	fr={144,146},
 	fr_s=0.2, --anim speed
@@ -976,7 +1047,19 @@ bb=enemy:new{
 	spx=2, --sprite width
 	spy=2, --sprite height
 	s=0.5,
+	angof=0,
 }
+function bb:atk()
+	if self.y<110 then
+		if ceil(time()*30)%10==0 then
+			local offset=self.angof
+			self:firespread(8,offset,1)
+			offset+=0.02
+			self.angof=offset%1
+		end
+	end
+	enemy.atk(self)
+end
 -->8
 --waves
 function init_waves()
@@ -999,10 +1082,10 @@ function init_waves()
 		},
 		{
 			--wave 3
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
+			{4,4,0,4,2,2,4,0,4,4},
+			{4,4,0,4,2,2,4,0,4,4},
+			{4,4,0,4,2,2,4,0,4,4},
+			{4,4,0,4,2,2,4,0,4,4},
 			atkfreq=40
 		},
 		{
