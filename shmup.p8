@@ -48,8 +48,14 @@ do
 		if (shake>0) scrnshake()
 		draw[state]()
 		--debug layout/ui
---		line(0,0,0,127,5)
---		line(64,0,64,127,5)
+		local x=6
+		for i=1,10 do
+			line(x,0,x,127,8)
+			line(x+8,0,x+8,127,9)
+			x+=12
+		end
+		line(0,0,0,127,5)
+		line(64,0,64,127,5)
 --		line(127,0,127,127,5)
 --		print("❎",0,0,2) --7x5 px
 --		print("ww",0,6,2) --7x5 px
@@ -323,13 +329,17 @@ function spawnenemies(row,i)
 	for i=1,#row do
 		local et,e,x0=etyp[row[i]]
 		if (not et) goto nxt
-		x0=64+24*(i-(#row/2)-0.5)
+--		x0=64+24*(i-(#row/2)-0.5)
+		x0=x
 		e=spawnenemy(et,x0,y)
+		--debug
+		e.spawnx=x
+		--
 		--perhaps vectors?
 		e.tx,e.ty=x,y+56
 		--this could use trig if i felt extra
 --		e.wait=i*3
-		e.wait=abs(i-(#row/2)-0.5)*3
+		e.wait=abs(i-(#row/2)-0.5)*1.5
 --		e.wait=(5-abs(i-(#row/2)-0.5))*3
 		::nxt::
 		x+=(e and e.spx*8 or 8)+4
@@ -898,6 +908,7 @@ function enemy:draw()
 --	print(hold and "y" or "n",self.x,self.y+8,8)
 --	if (self.frame) print(self.frame,self.x,self.y+8,8)
 --	if (self.act==self.atk) print(self.dx,self.x,self.y+8,8)
+	if (self.spawnx) print(self.spawnx,self.x,self.y+8,8)
 end
 function enemy:flash()
 	--flash white on dmg
@@ -1015,10 +1026,41 @@ jelly=enemy:new{
 	sp=101, --101-104
 	fr={101,102,103,104},
 	♥=2,
+	ang=0,
+	ty=20,
+	lr=0
 }
 function jelly:atk()
-	--todo
-	enemy.atk(self)
+	local dx,dy=0,0
+	local r=1
+	if self.ty>0 then
+		dy=1
+		self.ty-=1
+		if self.ty<=0 then
+			if (self.y<80) self:fire()
+			if self.x<12 then
+				--go right
+				self.lr=-1
+			elseif self.x>108 then
+				--go left
+				self.lr=1
+			else
+				--random
+				self.lr=rnd({-1,1})
+			end
+		end
+	else
+		--move in arc
+		dx=self.lr*r*sin(self.ang)
+		dy=-r*cos(self.ang)
+		self.ang+=0.02
+		if self.ang>=0.5 then
+			self.ang=0
+			self.ty=20+flr(rnd(20))
+		end
+	end
+	self:move(dx,dy)
+--	enemy.atk(self)
 end
 
 --red
@@ -1069,17 +1111,17 @@ function init_waves()
 	--4: red
 	--5: yellow/bb
 	return {
-		{
-			--0: testing
-			{0,0,0,0,0,0,0,0,0,0},
-			{3,3,0,0,3,3,0,0,3,3},
-			{3,3,0,0,3,3,0,0,3,3},
-			{0,0,0,0,0,0,0,0,0,0},
-			atkfreq=40
-		},
+--		{
+--			--0: testing
+--			{0,0,0,0,0,0,0,0,0,0},
+--			{3,3,0,0,3,3,0,0,3,3},
+--			{3,3,0,0,3,3,0,0,3,3},
+--			{0,0,0,0,0,0,0,0,0,0},
+--			atkfreq=40
+--		},
 		{
 			--1: "space invaders"
-			{0,1,1,1,1,1,1,1,1,0},
+			{1,1,1,1,1,1,1,1,1,1},
 			{0,1,1,1,1,1,1,1,1,0},
 			{0,1,1,1,1,1,1,1,1,0},
 			{0,1,1,1,1,1,1,1,1,0},
