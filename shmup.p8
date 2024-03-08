@@ -314,16 +314,18 @@ function enemy_col(e)
 		--create explosion fx
 		spawnexplosion(e.x+4,e.y+4,
 			"blue")
-		--spawn pkup
-		if rnd()<0.2 then
-			spawnpkup(e.x,e.y)
-		end
+		local pup=0.15 --pkup chance
 		if e.act==e.atk then
 			--select new enemy to atk
 			local ne=selectenemy()
 			if ne and rnd()>=.5 then
 				ne.act=ne.atk
 			end
+			pup=0.3
+		end
+		--spawn pkup
+		if rnd()<pup then
+			spawnpkup(e.x,e.y)
 		end
 		--score,sfx feedback
 		sfx(2)
@@ -1144,13 +1146,15 @@ pickup=gmobj:new{
 }
 function pickup:update()
 	gmobj.update(self) --anim
-	self:move(0,0.5)
+	self:move(0,0.75)
 	if self:col(p) then
 		--collect pickup
 		self:collect()
 		sfx(30)
 		del(pkups,self)
 	end
+	--rm offscreen pkups
+	if (self.y>128) del(pkups,self)
 end
 function pickup:collect()
 	coins+=1
