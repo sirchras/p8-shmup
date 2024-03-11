@@ -110,6 +110,8 @@ function blink(c1,c2)
 	end
 end
 
+--screenshake - move camera
+-- by decaying random offset
 function scrnshake()
 	local offx=rnd(shake)-shake/2
 	local offy=rnd(shake)-shake/2
@@ -321,6 +323,12 @@ function enemy_col(e)
 			if ne and rnd()>=.5 then
 				ne.act=ne.atk
 			end
+			add(pfx,txt:new{
+				x=e.x+4,
+				y=e.y+4,
+				str="100",
+			})
+			--todo: bonus to score?
 			pup=0.3
 		end
 		--spawn pkup
@@ -333,6 +341,7 @@ function enemy_col(e)
 	end
 end
 
+--spawn a pickup
 function spawnpkup(x,y)
 	local pkup=pickup
 	if p.♥<p.m♥ then
@@ -382,9 +391,9 @@ do
 end
 
 --spawn a row of enemies
--- this is a math nightmare
--- and prob should be fixed
 function spawnenemies(row,i)
+	-- this is a math nightmare
+	-- and prob should be fixed
 	local x,y=6,-10*(i+1)
 	local etyp={green,spinner,
 		jelly,red,bb}
@@ -404,6 +413,7 @@ function spawnenemies(row,i)
 	end
 end
 
+--spawn an enemy
 function spawnenemy(typ,x,y)
 	local e=typ:new{
 		x=x or rnd(120),
@@ -415,8 +425,8 @@ end
 
 --select available enemy to atk
 -- bias towards front
---fn might be doing too much...
 function selectenemy()
+	--fn might be doing too much...
 --	local e=rnd(enemies)
 	local r=#enemies%10
 	local n=r==0 and 10 or r
@@ -748,6 +758,29 @@ end
 function skwv:draw()
 	circ(self.x,self.y,
 		self.r,self.c)
+end
+
+--floating txt
+txt=ptc:new{
+	c1=7,
+	c2=8,
+	str="hello world",
+	dy=-0.5,
+}
+function txt:update()
+	--alternate colors
+	local c,fr=self.c1,ceil(time()*30)
+	if (fr%8<4) c=self.c2
+	self.c=c
+	--update position
+	self.y+=self.dy
+	--call parent update
+	ptc.update(self)
+end
+function txt:draw()
+	local str=self.str
+	print(str,self.x-#str*2,
+		self.y,self.c)
 end
 -->8
 --classes: player,projectiles
@@ -1166,7 +1199,13 @@ heart=pickup:new{
 	fr={152,153,154,155}, --anim frames
 }
 function heart:collect()
-	if (p.♥<p.m♥) p.♥+=1
+	if (p.♥==p.m♥) return
+	p.♥+=1
+	add(pfx,txt:new{
+		x=self.x,
+		y=self.y,
+		str="1up!",
+	})
 end
 
 --waves
