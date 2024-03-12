@@ -411,7 +411,6 @@ end
 
 --spawn wave
 function spawnwave(wave)
-	local y=-8
 	local wave=waves[wave]
 	for i=1,#wave do
 		local row=wave[i]
@@ -432,24 +431,20 @@ end
 
 --spawn a row of enemies
 function spawnenemies(row,i)
-	-- this is a math nightmare
-	-- and prob should be fixed
-	local x,y=6,-10*(i+1)
+	local y=-10*(i+1)
 	local etyp={green,spinner,
 		jelly,red,bb}
 	for i=1,#row do
-		local et,e,x0=etyp[row[i]]
-		if (not et) goto nxt
-		x0=x
-		e=spawnenemy(et,x0,y)
+		local x=6+(i-1)*12
+		local et=etyp[row[i]]
+		if (not et) goto continue
+		if (et.spx>1) x+=2
+		local e=spawnenemy(et,x,y)
 		--perhaps vectors?
 		e.tx,e.ty=x,y+56
-		--this could use trig if i felt extra
---		e.wait=i*3
 		e.wait=abs(i-(#row/2)-0.5)*1.5
 --		e.wait=(5-abs(i-(#row/2)-0.5))*3
-		::nxt::
-		x+=(e and e.spx*8 or 8)+4
+		::continue::
 	end
 end
 
@@ -1461,3 +1456,4 @@ __music__
 01 12131415
 00 16131417
 02 18191a1b
+
