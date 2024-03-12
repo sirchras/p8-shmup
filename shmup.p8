@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
---main
+--main/util
 do
 	--state transition vars
 	local state,target_state
@@ -124,6 +124,8 @@ function scrnshake()
 	end
 end
 -->8
+--start/end screens
+
 --start state
 function startscrn()
 	--set state, play music
@@ -146,6 +148,51 @@ do
 			12)
 		print("press ❎ to start",30,
 			80,blnk())
+	end
+end
+
+--over state
+do
+	local drawtxt,drawwin,drawlose
+	function gameover(win)
+		--set state
+		setstate("over",30)
+		drawtxt=win and drawwin
+			or drawlose
+--		setstate("over")
+		--play music
+		music(win and 0 or 6)
+		--set btnp delay
+		setbtnpdelay()
+	end
+
+	function update_over()
+		--anim any remaining ptc
+		for ptc in all(pfx) do
+			ptc:update()
+		end
+		if btnp(❎) then
+			--start game
+	--		startgame()
+			startscrn()
+		end
+	end
+
+	local blnk=blink(6,7)
+	function draw_over()
+		draw_game() --draw game in bg
+		drawtxt()
+		print("press ❎ to restart",
+			25,80,blnk())
+	end
+
+	--drawtxt
+	drawwin=function()
+		print("congratulations",35,
+			40,12)
+	end
+	drawlose=function()
+		print("game over",47,40,8)
 	end
 end
 -->8
@@ -219,13 +266,7 @@ function update_game()
 		if fr>firenext then
 			local e=selectenemy()
 			if e and e.act==e.hold then
-				if e.typ=="bb" then
-					e:firespread(8)
-				elseif e.typ=="red" then
-					e:fireaimed(p)
-				else
-					e:fire()
-				end
+				e:fire()
 				firenext=fr+20+rnd(20)
 			end
 		end
@@ -292,7 +333,6 @@ function draw_game()
 		displaywavetxt()
 	end
 end
-
 
 --gmobj-player collisions
 function player_col()
@@ -545,51 +585,6 @@ function bgrnd()
 	return {update=_upd,draw=_drw}
 end
 -->8
---over state
-do
-	local drawtxt,drawwin,drawlose
-	function gameover(win)
-		--set state
-		setstate("over",30)
-		drawtxt=win and drawwin
-			or drawlose
---		setstate("over")
-		--play music
-		music(win and 0 or 6)
-		--set btnp delay
-		setbtnpdelay()
-	end
-
-	function update_over()
-		--anim any remaining ptc
-		for ptc in all(pfx) do
-			ptc:update()
-		end
-		if btnp(❎) then
-			--start game
-	--		startgame()
-			startscrn()
-		end
-	end
-
-	local blnk=blink(6,7)
-	function draw_over()
-		draw_game() --draw game in bg
-		drawtxt()
-		print("press ❎ to restart",
-			25,80,blnk())
-	end
-
-	--drawtxt
-	drawwin=function()
-		print("congratulations",35,
-			40,12)
-	end
-	drawlose=function()
-		print("game over",47,40,8)
-	end
-end
--->8
 --classes: gmobj & particles
 
 --util class to avoid repetition
@@ -790,8 +785,8 @@ player=gmobj:new{
 	sp=2, --player sprite
 	fsp=5, --flame sprite
 	s=2, --movement speed
-	fr=4, --fire rate
-	fc=0, --fire cooldown
+--	fr=4, --fire rate
+--	fc=0, --fire cooldown
 	mflsh=0, --muzzle flash
 	♥=3, --current lives
 	m♥=3, --max lives
@@ -813,18 +808,7 @@ function player:update()
 	if (btn(⬇️)) dy=self.s
 --	if btn(❎) and self.fc<=0 then
 	if btnp(❎) then
-		--spawn new bullet
-		add(bullets,bullet:new{
-			x=self.x,
-			y=self.y-6,
-			dy=-2
-		})
-		--reset fire cooldown
-		self.fc=self.fr
-		--set muzzle flash
-		self.mflsh=4
-		--play firing sfx
-		sfx(0)
+		self:fire()
 	end
 	--move/update player
 	self:move(dx,dy)
@@ -834,7 +818,7 @@ function player:update()
 	--decrm iframes
 	if (self.invul>0) self.invul-=1
 	--decrm fire cooldown
-	if (self.fc>0) self.fc-=1
+--	if (self.fc>0) self.fc-=1
 	--anim muzzle flash
 	if (self.mflsh>0) self.mflsh-=1
 	--anim flame
@@ -860,12 +844,28 @@ function player:draw()
 		circfill(x+4,y,self.mflsh,7)
 	end
 end
+function player:fire()
+	--spawn new bullet
+	fire(self,bullet)
+	--set muzzle flash
+	self.mflsh=4
+	--reset fire cooldown
+--	self.fc=self.fr
+	--sfx
+	sfx(0)
+end
 
 --bullet class
 bullet=gmobj:new{
 	sp=14, --bullet sprite
 	dx=0, --x velocity
 	dy=0, --y velocity
+	_w=6, --sprite width
+	_h=6, --sprite height
+	colw=4, --collider width
+	colh=4, --collider height
+	colxoff=1, --collider x offset
+	colyoff=1, --collider y offset
 }
 function bullet:update()
 	self:move(self.dx,self.dy)
@@ -874,9 +874,10 @@ function bullet:update()
 		if self:col(e) then
 			enemy_col(e)
 			del(bullets,self)
+			--create impact fx
 			spawnimpact(self.x+4,
 				self.y+4)
-			sfx(3)
+			sfx(3) --hit sfx
 		end
 	end
 end
@@ -906,6 +907,38 @@ function ebullet:update()
 	end
 end
 
+--fire a bullet
+function fire(self,typ,ang,spd)
+	local ang=ang or 0.5
+	local spd=spd or 2
+	--spawn new bullet
+	return add(bullets,typ:new{
+		--this assumes spr is not
+		-- offset from top-left
+		x=self.x+(self:w()-typ:w())/2+(sin(ang)*(self:w()+typ:w())/2),
+		y=self.y+(self:h()-typ:h())/2+(cos(ang)*(self:h()+typ:h())/2),
+		dx=spd*sin(ang),
+		dy=spd*cos(ang)
+	})
+end
+
+--fire a circle of bullets
+function firespread(self,typ,n,ang,spd)
+	for i=1,n do
+		fire(self,typ,ang+i/n,spd)
+	end
+end
+
+--fire an aimed bullet
+function fireaimed(self,typ,t,spd)
+	local b=fire(self,typ,0,spd)
+	local dy=t.y-b.y+(t:h()-b:h())/2
+	local dx=t.x-b.x+(t:w()-b:w())/2
+	local ang=atan2(dy,dx)
+	b.dx=spd*sin(ang)
+	b.dy=spd*cos(ang)
+	return b
+end
 -->8
 --classes: enemies
 
@@ -923,6 +956,7 @@ enemy=gmobj:new{
 	wait=0, --wait before active
 	shke=0, --shake
 	s=1, --default mv speed
+	b=ebullet,
 }
 function enemy:update()
 	if (self.shke>0) self.shke-=1
@@ -981,41 +1015,10 @@ end
 function enemy:fire(ang,spd)
 	local ang=ang or 0
 	local spd=spd or 2
---	local spd=0.2
-	local b=ebullet
-	sfx(29)
 	--spawn new bullet
-	return add(bullets,b:new{
-		--mathematically correct,
-		-- but looks like a lot
-		-- simplify?
-		x=self.x+(self:w()-b:w())/2+(sin(ang)*(self:w()+b:w())/2),
-		y=self.y+(self:h()-b:h())/2+(cos(ang)*(self:h()+b:h())/2),
-		dx=spd*sin(ang),
-		dy=spd*cos(ang)
-	})
-end
---todo: make class agnostic?
-function enemy:firespread(n,ang,spd)
-	local ang=ang or 0
-	local spd=spd or 2
-	for i=1,n do
-		self:fire(ang+i/n,spd)
-	end
-end
---todo: make class agnostic?
-function enemy:fireaimed(t,spd)
-	local t=t or p --default player
-	local spd=spd or 2
---	local spd=0.2
-	local b=self:fire()
-	local dy=t.y-b.y+(t:h()-b:h())/2
-	local dx=t.x-b.x+(t:w()-b:w())/2
-	local ang=atan2(dy,dx)
-	b.dx=spd*sin(ang)
-	b.dy=spd*cos(ang)
-	--debug
---	b.ang=ang
+	fire(self,self.b,ang,spd)
+	--sfx
+	sfx(29)
 end
 --enemy behavior: advance
 function enemy:adv()
@@ -1138,8 +1141,15 @@ function red:atk()
 	self:move(dx,dy)
 	self.x=mid(0,self.x,120)
 end
+--ang argument?
+function red:fire(spd)
+	local spd=spd or 2
+	-- fire aimed shot
+	fireaimed(self,self.b,p,spd)
+	--sfx
+	sfx(29)
+end
 
---todo: change name
 --golden bug?
 bb=enemy:new{
 	typ="bb",
@@ -1156,12 +1166,18 @@ function bb:atk()
 	if self.y<110 then
 		if ceil(time()*30)%10==0 then
 			local offset=self.angof
-			self:firespread(8,offset,1)
+			self:fire(offset)
 			offset+=0.02
 			self.angof=offset%1
 		end
 	end
 	enemy.atk(self)
+end
+function bb:fire(ang,spd)
+	local ang=ang or 0
+	local spd=spd or 1
+	firespread(self,self.b,8,ang,spd)
+	sfx(29)
 end
 -->8
 --pickups & waves
@@ -1315,13 +1331,13 @@ function init_waves()
 	}
 end
 __gfx__
-00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000000000000000000
-0000000000288200002882000028820000000000000aa000000aa000000aa00000a77a00000aa00088880080888888808008008009aaaa900099990000000000
-007007000028820000288200002882000000000000a77a000007700000a77a0009aaaa9000a77a008880008088888880800000809aa77aa909aaaa9000099000
-0007700002888e2002e88e2002e8882000000000009aa900000aa000009aa90000999900009aa9000888080008888800080008009a7777a909a77a90009a7900
-00077000027c8e202e87c8e202e8c7200000000000099000000aa0000009900000000000000990000080800000888000008080009a7777a909a77a90009aa900
-007007000211882028811882028811200000000000000000000990000000000000000000000000000008000000080000000800009aa77aa909aaaa9000099000
-00000000025d820028d55d820028d52000000000000000000000000000000000000000000000000000000000000000000000000009aaaa900099990000000000
+00000000000220000002200000022000000000000000000000000000000000000000000000000000088088000880880008808800009999000999900000000000
+0000000000288200002882000028820000000000000aa000000aa000000aa00000a77a00000aa00088880080888888808008008009aaaa909aaaa90000000000
+007007000028820000288200002882000000000000a77a000007700000a77a0009aaaa9000a77a008880008088888880800000809aa77aa99a77a90000099000
+0007700002888e2002e88e2002e8882000000000009aa900000aa000009aa90000999900009aa9000888080008888800080008009a7777a99a77a900009a7900
+00077000027c8e202e87c8e202e8c7200000000000099000000aa0000009900000000000000990000080800000888000008080009a7777a99aaaa900009aa900
+007007000211882028811882028811200000000000000000000990000000000000000000000000000008000000080000000800009aa77aa90999900000099000
+00000000025d820028d55d820028d52000000000000000000000000000000000000000000000000000000000000000000000000009aaaa900000000000000000
 00000000029d200002d99d200002d920000000000000000000000000000000000000000000000000000000000000000000000000009999000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ee000000ee000000770000
 000000000000000000000000000000000000000000077000000770000007700000c77c00000770000000000000000000000000000e22e0000e88e00007dd7000
@@ -1445,4 +1461,3 @@ __music__
 01 12131415
 00 16131417
 02 18191a1b
-
