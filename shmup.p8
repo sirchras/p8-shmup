@@ -96,8 +96,8 @@ end
 function setbtnpdelay(delay)
 	--default init btnp delay: 15
 	--default rep btnp delay: 4
-	local delay=delay or 255
-	poke(0x5f5c,delay)
+	poke(0x5f5c,delay or 255)
+	poke(0x5f5d,delay or 0)
 end
 
 --return fn that alternates
@@ -144,7 +144,7 @@ do
 	local blnk=blink(6,7)
 	function draw_start()
 		cls(1)
-		print("shmup game v0.5",34,40,
+		print("shmup game v0.idk",30,40,
 			12)
 		print("press ❎ to start",30,
 			80,blnk())
@@ -756,6 +756,7 @@ txt=ptc:new{
 	c2=8,
 	str="hello world",
 	dy=-0.5,
+	mt=120,
 }
 function txt:update()
 	--alternate colors
@@ -771,7 +772,13 @@ function txt:draw()
 	local str=self.str
 	print(str,self.x-#str*2,
 		self.y,self.c)
+--	cntrprint(self.str,self.x,
+--		self.y,self.c)
 end
+
+--function cntrprint(str,x,y,c)
+--	print(str,x-#str*2,y,c)
+--end
 -->8
 --classes: player,projectiles
 
@@ -842,6 +849,8 @@ end
 function player:fire()
 	--spawn new bullet
 	fire(self,bullet)
+--	firedouble(self,bullet)
+--	firearc2(self,bullet,4)
 	--set muzzle flash
 	self.mflsh=4
 	--reset fire cooldown
@@ -916,6 +925,39 @@ function fire(self,typ,ang,spd)
 		dy=spd*cos(ang)
 	})
 end
+
+--fire dual bullets
+function firedouble(self,typ,ang,spd)
+	local b1=fire(self,typ,ang,spd)
+	local b2=fire(self,typ,ang,spd)
+	b1.x+=(self:w()/2-typ:w()-1)
+	b2.x+=(self:w()/2+1)
+end
+
+--fire an arc of n bullets
+-- nb: should limit, n=5 every
+-- 4 frames will cause drops
+-- when spawning waves
+function firearc(self,typ,n,ang,spd)
+	local ang=ang or 0.5
+	local spd=spd or 2
+	local inc=0.25/(n-1)
+	ang-=0.125
+	for i=1,n do
+		fire(self,typ,ang+(i-1)*inc,spd)
+	end
+end
+
+--function firearc2(self,typ,n,ang,spd)
+--	--math not quite right
+--	local ang=ang or 0.5
+--	local spd=spd or 2
+--	local inc=0.05
+--	ang-=(n*inc)/2
+--	for i=1,n do
+--		fire(self,typ,ang+(i-1)*inc,spd)
+--	end
+--end
 
 --fire a circle of bullets
 function firespread(self,typ,n,ang,spd)
