@@ -344,6 +344,7 @@ function player_col()
 	--update player health,iframes
 	p.♥-=1
 	p.invul=60
+	p.fmode=1
 end
 
 --gmobj-enemy collisions
@@ -789,10 +790,11 @@ player=gmobj:new{
 	s=2, --movement speed
 --	fr=4, --fire rate
 --	fc=0, --fire cooldown
+	fmode=1, --fire mode
 	mflsh=0, --muzzle flash
 	♥=3, --current lives
 	m♥=3, --max lives
-	invul=0 --iframes
+	invul=0, --iframes
 }
 function player:update()
 	local sp=2 --default sprite
@@ -848,15 +850,36 @@ function player:draw()
 end
 function player:fire()
 	--spawn new bullet
-	fire(self,bullet)
---	firedouble(self,bullet)
---	firearc2(self,bullet,4)
+	if self.fmode==1 then
+		fire(self,bullet)
+	elseif self.fmode==2 then
+		firedouble(self,bullet)
+	else
+		firearc2(self,bullet,self.fmode)
+	end
 	--set muzzle flash
 	self.mflsh=4
 	--reset fire cooldown
 --	self.fc=self.fr
 	--sfx
 	sfx(0)
+end
+function player:upgrade()
+	if self.fmode>=4 then
+		score+=100
+		add(pfx,txt:new{
+			x=self.x,
+			y=self.y,
+			str="100",
+		})
+		return
+	end
+	self.fmode+=1
+	add(pfx,txt:new{
+		x=self.x,
+		y=self.y,
+		str="+weap+",
+	})
 end
 
 --bullet class
@@ -934,13 +957,14 @@ function firedouble(self,typ,ang,spd)
 	b2.x+=(self:w()/2+1)
 end
 
---fire an arc of n bullets
+--fire an arc of n>1 bullets
 -- nb: should limit, n=5 every
 -- 4 frames will cause drops
 -- when spawning waves
 function firearc(self,typ,n,ang,spd)
 	local ang=ang or 0.5
 	local spd=spd or 2
+--	if (n==1) return fire(self,typ,ang,spd)
 	local inc=0.25/(n-1)
 	ang-=0.125
 	for i=1,n do
@@ -948,16 +972,18 @@ function firearc(self,typ,n,ang,spd)
 	end
 end
 
---function firearc2(self,typ,n,ang,spd)
---	--math not quite right
---	local ang=ang or 0.5
---	local spd=spd or 2
---	local inc=0.05
---	ang-=(n*inc)/2
---	for i=1,n do
+--a tighter arc
+function firearc2(self,typ,n,ang,spd)
+	local ang=ang or 0.5
+	local spd=spd or 2
+	local inc=0.25/(n+1)
+--	ang-=(0.125-inc)
+	ang-=0.125
+	for i=1,n do
 --		fire(self,typ,ang+(i-1)*inc,spd)
---	end
---end
+		fire(self,typ,ang+i*inc,spd)
+	end
+end
 
 --fire a circle of bullets
 function firespread(self,typ,n,ang,spd)
@@ -976,6 +1002,9 @@ function fireaimed(self,typ,t,spd)
 	b.dy=spd*cos(ang)
 	return b
 end
+
+--would be cool if there was a
+-- laser beam-like firing mode
 -->8
 --classes: enemies
 
@@ -1244,6 +1273,11 @@ function pickup:update()
 end
 function pickup:collect()
 	coins+=1
+	if coins>=10 then
+		--upgrade weapon?
+		p:upgrade()
+		coins-=10
+	end
 end
 
 --pickup - heart
@@ -1260,6 +1294,8 @@ function heart:collect()
 		str="1up!",
 	})
 end
+
+--bomb pickup?
 
 --waves
 function init_waves()
