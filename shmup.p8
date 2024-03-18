@@ -17,6 +17,7 @@ do
 --		setbtnpdelay()
 		shake=0
 		--debug
+--		debug=true
 --		frame=0
 	end
 
@@ -57,6 +58,8 @@ do
 --		line(0,0,0,127,5)
 --		line(64,0,64,127,5)
 --		line(127,0,127,127,5)
+		line(3,0,3,127,9)
+		line(124,0,124,127,9)
 --		print("❎",0,0,2) --7x5 px
 --		print("ww",0,6,2) --7x5 px
 --		print("♥",0,12,2) --7x5 px
@@ -122,6 +125,13 @@ function scrnshake()
 		shake-=1
 		if (shake<1) shake=0
 	end
+end
+
+--return estimated index of 
+-- current frame
+function frame()
+	--assumes no frame drops
+	return ceil(time()*30)
 end
 -->8
 --start/end screens
@@ -351,6 +361,7 @@ end
 function enemy_col(e)
 	e.♥-=1
 	e.flsh=4
+	if (e.typ=="boss") e.flsh=8
 	if e.♥<=0 then
 		--delete the dead enemy
 		del(enemies,e)
@@ -434,12 +445,12 @@ end
 function spawnenemies(row,i)
 	local y=-10*(i+1)
 	local etyp={green,spinner,
-		jelly,red,bb}
+		jelly,red,bb,boss}
 	for i=1,#row do
 		local x=6+(i-1)*12
 		local et=etyp[row[i]]
 		if (not et) goto continue
-		if (et.spx>1) x+=2
+		if (et.spx>1) x+=2*(et.spx-1)
 		local e=spawnenemy(et,x,y)
 		--perhaps vectors?
 		e.tx,e.ty=x,y+56
@@ -1022,6 +1033,7 @@ enemy=gmobj:new{
 	wait=0, --wait before active
 	shke=0, --shake
 	s=1, --default mv speed
+	fsfx=29, --fire sfx
 	b=ebullet,
 }
 function enemy:update()
@@ -1078,13 +1090,11 @@ function enemy:flash()
 	end
 end
 --todo: make class agnostic?
-function enemy:fire(ang,spd)
-	local ang=ang or 0
-	local spd=spd or 2
+function enemy:fire()
 	--spawn new bullet
-	fire(self,self.b,ang,spd)
+	fire(self,self.b,0,2)
 	--sfx
-	sfx(29)
+	sfx(self.fsfx)
 end
 --enemy behavior: advance
 function enemy:adv()
@@ -1098,7 +1108,7 @@ function enemy:adv()
 	self:move(dx,dy)
 end
 function enemy:hold()
-	--do something?
+	--replace this with nil?
 end
 function enemy:atk()
 	--attack
@@ -1208,10 +1218,9 @@ function red:atk()
 	self.x=mid(0,self.x,120)
 end
 --ang argument?
-function red:fire(spd)
-	local spd=spd or 2
+function red:fire()
 	-- fire aimed shot
-	fireaimed(self,self.b,p,spd)
+	fireaimed(self,self.b,p,2)
 	--sfx
 	sfx(29)
 end
@@ -1231,23 +1240,112 @@ bb=enemy:new{
 function bb:atk()
 	if self.y<110 then
 		if ceil(time()*30)%10==0 then
-			local offset=self.angof
-			self:fire(offset)
-			offset+=0.02
-			self.angof=offset%1
+			self:fire()
 		end
 	end
 	enemy.atk(self)
 end
-function bb:fire(ang,spd)
-	local ang=ang or 0
-	local spd=spd or 1
-	firespread(self,self.b,8,ang,spd)
+function bb:fire()
+	local ang=self.angof
+	--fire spread
+	firespread(self,self.b,8,ang,1)
+	ang+=0.02
+	self.angof=ang%1
+	--sfx
 	sfx(29)
 end
 -->8
---boss
+--classes: boss
 
+boss=enemy:new{
+	sp=196, --enemy sprite
+	fr={196,200,204,200}, --anim frames
+	fr_i=1, --current anim frame
+	fr_s=0.4, --anim speed
+	♥=20, --enemy health
+	spx=4, --sprite width
+	spy=3, --sprite height
+	typ="boss", --type
+	s=1.5, --default mv speed
+	pht=0, --phase timer
+	fsfx=34, --fire sfx
+	--debug
+	ph=nil,
+}
+function boss:draw()
+	enemy.draw(self)
+	--debug
+	print(self.tx..", "..self.ty,self.x,self.y+self:h(),8)
+	print(self.ph,self.x,self.y+self:h()+7,11)
+	--	
+end
+function boss:flash()
+	self.sp=192
+	if frame()%4<2 then
+		pal(3,8)
+		pal(11,14)
+	end
+end
+function boss:adv()
+	local dx=min(1,(self.tx-self.x)/8)
+	local dy=min(1,(self.ty-self.y)/8)
+	if abs(self.y-self.ty)<0.5 then
+		self.y=self.ty
+		self.x=self.tx
+		self.act=self.phase1
+		self.pht=frame()+240 --8 sec
+	end
+	self:move(dx,dy)	
+end
+function boss:phase1()
+	--debug
+	self.ph="ph1"
+	--
+	--movement
+	local dx=self.dx
+	if (not dx) dx=rnd({-self.s,self.s})
+	if (self.x<=3 or self.x+self:w()>=124) dx=-dx
+	self:move(dx,0)
+	self.dx=dx
+	--shooting
+	local fr=frame()
+	if fr%30>4 then
+		--break of 4 frames
+		if (fr%3==0) self:fire()
+	end
+	--transition
+	self:checkphasetrans(self.phase2)
+end
+function boss:phase2()
+	--debug
+	self.ph="ph2"
+	--
+	--movement
+	local i=1
+	local targets={
+		{92,16},{92,88},{3,88},
+		{3,16},{48,16}
+	}
+	--shooting
+	--transition
+	self:checkphasetrans(self.phase3)
+end
+function boss:phase3()
+	--todo
+	self.ph="ph3"
+	self:checkphasetrans(self.phase4)
+end
+function boss:phase4()
+	--todo
+	self.ph="ph4"
+	self:checkphasetrans(self.phase1)
+end
+function boss:checkphasetrans(nextphase)
+	if frame()>self.pht then
+		self.act=nextphase
+		self.pht=frame()+240 --8 sec
+	end
+end
 -->8
 --pickups & waves
 
@@ -1308,14 +1406,14 @@ function init_waves()
 	--4: red
 	--5: yellow/bb
 	return {
---		{
---			--0: testing
---			{0,0,0,0,0,0,0,0,0,0},
---			{3,3,0,0,3,3,0,0,3,3},
---			{3,3,0,0,3,3,0,0,3,3},
---			{0,0,0,0,0,0,0,0,0,0},
---			atkfreq=40
---		},
+		{
+			--0: testing
+			{0,0,0,6,0,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
+			atkfreq=1800
+		},
 		{
 			--1: "space invaders"
 			{0,1,1,1,1,1,1,1,1,0},
@@ -1398,8 +1496,8 @@ function init_waves()
 		},
 		{
 			--"boss"
+			{0,0,0,6,0,0,0,0,0,0},
 			{0,0,0,0,0,0,0,0,0,0},
-			{0,0,0,0,5,0,0,0,0,0},
 			{0,0,0,0,0,0,0,0,0,0},
 			{0,0,0,0,0,0,0,0,0,0},
 			atkfreq=40
@@ -1559,6 +1657,10 @@ __sfx__
 10050000385623555233552315522f5522d5522b5522954227552265522355222552215521e5421d5421a5421854217542155421454212542105420e5420d5320b53209522075120551203512015120051200512
 480200001735005300113400b32009320073200735000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00030000297722d762307423473237712397123c7323c732007020070200702007020070200702007020070200702007020070200702007020070200702007020070200702007020070200702007020070200702
+000a0000070560c0660f07616076180661f056220472703733037330573c0673e0062b00625006200061b0061700614006110060f0060d0060c0060a006090060600606006050060500600000000000000000000
+000400000744007420074200a40000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
+4a0200002c6412f66130661316613766132661326612b6612866125671226611e661146611a651166510864111641056410c64105641046410264102631026310163101621006210062100611006110061100611
+000100000914008150081600f160121400f1400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __music__
 04 04050644
 00 07084749
@@ -1570,3 +1672,4 @@ __music__
 01 12131415
 00 16131417
 02 18191a1b
+
