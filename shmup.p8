@@ -127,7 +127,7 @@ function scrnshake()
 	end
 end
 
---return estimated index of 
+--return estimated index of
 -- current frame
 function frame()
 	--assumes no frame drops
@@ -1049,6 +1049,13 @@ function enemy:update()
 	--enemy state - action
 	if (not self.act) self.act=self.adv
 	self:act()
+	--debug
+--	if self.typ=="boss" then
+--		if (frame()%5==0) self:act()
+--	else
+--		self:act()
+--	end
+	--
 	--check enemy/player collision
 	if self:col(p) and
 	   p.invul==0 then
@@ -1104,6 +1111,7 @@ function enemy:adv()
 		self.y=self.ty
 		self.x=self.tx
 		self.act=self.hold
+		return
 	end
 	self:move(dx,dy)
 end
@@ -1268,16 +1276,21 @@ boss=enemy:new{
 	typ="boss", --type
 	s=1.5, --default mv speed
 	pht=0, --phase timer
+	p2i=1, --phase 2 index
 	fsfx=34, --fire sfx
 	--debug
 	ph=nil,
+	ddx=0,
+	ddy=0,
 }
 function boss:draw()
 	enemy.draw(self)
 	--debug
-	print(self.tx..", "..self.ty,self.x,self.y+self:h(),8)
+	print(self.tx..", "..self.ty,0,8,8)
+	print(self.x..", "..self.y,0,14,8)
+	print(self.ddx..", "..self.ddy,0,20,8)
 	print(self.ph,self.x,self.y+self:h()+7,11)
-	--	
+	--
 end
 function boss:flash()
 	self.sp=192
@@ -1292,10 +1305,12 @@ function boss:adv()
 	if abs(self.y-self.ty)<0.5 then
 		self.y=self.ty
 		self.x=self.tx
-		self.act=self.phase1
+--		self.act=self.phase1
+		self.act=self.phase2
 		self.pht=frame()+240 --8 sec
+		return
 	end
-	self:move(dx,dy)	
+	self:move(dx,dy)
 end
 function boss:phase1()
 	--debug
@@ -1321,12 +1336,29 @@ function boss:phase2()
 	self.ph="ph2"
 	--
 	--movement
-	local i=1
+	local spd=1.5
+	local i=self.p2i
 	local targets={
-		{92,16},{92,88},{3,88},
+		{92,16},{92,98},{3,98},
 		{3,16},{48,16}
 	}
+	local tx,ty=unpack(targets[i])
+	self.tx=tx
+	self.ty=ty
+	local dx=mid(-spd,tx-self.x,spd)
+	local dy=mid(-spd,ty-self.y,spd)
+	self.ddx=dx
+	self.ddy=dy
+	if abs(self.x-tx)<0.5 and
+	   abs(self.y-ty)<0.5 then
+		self.x=tx
+		self.y=ty
+		self.p2i=(i%#targets)+1
+		return
+	end
+	self:move(dx,dy)
 	--shooting
+	if (frame()%15==0) red.fire(self)
 	--transition
 	self:checkphasetrans(self.phase3)
 end
@@ -1672,4 +1704,3 @@ __music__
 01 12131415
 00 16131417
 02 18191a1b
-
