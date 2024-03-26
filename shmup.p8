@@ -1244,6 +1244,7 @@ bb=enemy:new{
 	spy=2, --sprite height
 	s=0.5,
 	angof=0,
+	anginc=0.02,
 }
 function bb:atk()
 	if self.y<110 then
@@ -1254,10 +1255,10 @@ function bb:atk()
 	enemy.atk(self)
 end
 function bb:fire()
-	local ang=self.angof
+	local ang=self.angof or 0
 	--fire spread
 	firespread(self,self.b,8,ang,1)
-	ang+=0.02
+	ang+=self.anginc or 0.02
 	self.angof=ang%1
 	--sfx
 	sfx(29)
@@ -1277,6 +1278,7 @@ boss=enemy:new{
 	s=1.5, --default mv speed
 	pht=0, --phase timer
 	p2i=1, --phase 2 index
+	anginc=1/24,
 	fsfx=34, --fire sfx
 	--debug
 	ph=nil,
@@ -1290,6 +1292,7 @@ function boss:draw()
 	print(self.x..", "..self.y,0,14,8)
 	print(self.ddx..", "..self.ddy,0,20,8)
 	print(self.ph,self.x,self.y+self:h()+7,11)
+	if (self.angof) print(self.angof,self.x,self.y+self:h(),2)
 	--
 end
 function boss:flash()
@@ -1306,7 +1309,8 @@ function boss:adv()
 		self.y=self.ty
 		self.x=self.tx
 --		self.act=self.phase1
-		self.act=self.phase2
+--		self.act=self.phase2
+		self.act=self.phase3
 		self.pht=frame()+240 --8 sec
 		return
 	end
@@ -1317,11 +1321,7 @@ function boss:phase1()
 	self.ph="ph1"
 	--
 	--movement
-	local dx=self.dx
-	if (not dx) dx=rnd({-self.s,self.s})
-	if (self.x<=3 or self.x+self:w()>=124) dx=-dx
-	self:move(dx,0)
-	self.dx=dx
+	self:pace()
 	--shooting
 	local fr=frame()
 	if fr%30>4 then
@@ -1336,24 +1336,24 @@ function boss:phase2()
 	self.ph="ph2"
 	--
 	--movement
-	local spd=1.5
+	local spd=self.s
 	local i=self.p2i
 	local targets={
 		{92,16},{92,98},{3,98},
-		{3,16},{48,16}
+		{3,16}
 	}
 	local tx,ty=unpack(targets[i])
-	self.tx=tx
-	self.ty=ty
 	local dx=mid(-spd,tx-self.x,spd)
 	local dy=mid(-spd,ty-self.y,spd)
-	self.ddx=dx
-	self.ddy=dy
+	self.dx=dx
 	if abs(self.x-tx)<0.5 and
 	   abs(self.y-ty)<0.5 then
 		self.x=tx
 		self.y=ty
 		self.p2i=(i%#targets)+1
+		if self.p2i==1 then
+			self.pht=frame()+30
+		end
 		return
 	end
 	self:move(dx,dy)
@@ -1363,8 +1363,15 @@ function boss:phase2()
 	self:checkphasetrans(self.phase3)
 end
 function boss:phase3()
-	--todo
+	--debug
 	self.ph="ph3"
+	--
+	--movement
+	self:pace(0.5)
+	--shooting
+--	self.anginc=sgn(self.dx)/24
+	if (frame()%10==0) bb.fire(self)
+	--transition
 	self:checkphasetrans(self.phase4)
 end
 function boss:phase4()
@@ -1377,6 +1384,15 @@ function boss:checkphasetrans(nextphase)
 		self.act=nextphase
 		self.pht=frame()+240 --8 sec
 	end
+end
+function boss:pace(spd)
+	local spd=spd or self.s
+	local dx=sgn(self.dx)*spd
+	if (not dx) dx=rnd({-spd,spd})
+	if (self.x<=3) dx=spd
+	if (self.x+self:w()>=124) dx=-spd
+	self:move(dx,0)
+	self.dx=dx
 end
 -->8
 --pickups & waves
@@ -1704,3 +1720,4 @@ __music__
 01 12131415
 00 16131417
 02 18191a1b
+
