@@ -1096,10 +1096,10 @@ function enemy:flash()
 		pal(i,7)
 	end
 end
---todo: make class agnostic?
-function enemy:fire()
+function enemy:fire(ang)
+	local ang=ang or 0
 	--spawn new bullet
-	fire(self,self.b,0,2)
+	fire(self,self.b,ang,2)
 	--sfx
 	sfx(self.fsfx)
 end
@@ -1277,7 +1277,7 @@ boss=enemy:new{
 	typ="boss", --type
 	s=1.5, --default mv speed
 	pht=0, --phase timer
-	p2i=1, --phase 2 index
+	pi=1, --path index
 	anginc=1/24,
 	fsfx=34, --fire sfx
 	--debug
@@ -1292,7 +1292,7 @@ function boss:draw()
 	print(self.x..", "..self.y,0,14,8)
 	print(self.ddx..", "..self.ddy,0,20,8)
 	print(self.ph,self.x,self.y+self:h()+7,11)
-	if (self.angof) print(self.angof,self.x,self.y+self:h(),2)
+	print(self.dx,self.x,self.y+self:h(),2)
 	--
 end
 function boss:flash()
@@ -1308,10 +1308,12 @@ function boss:adv()
 	if abs(self.y-self.ty)<0.5 then
 		self.y=self.ty
 		self.x=self.tx
---		self.act=self.phase1
+		self.act=self.phase1
 --		self.act=self.phase2
-		self.act=self.phase3
+--		self.act=self.phase3
+--		self.act=self.phase4
 		self.pht=frame()+240 --8 sec
+--		self.pht=frame()+1800
 		return
 	end
 	self:move(dx,dy)
@@ -1336,29 +1338,21 @@ function boss:phase2()
 	self.ph="ph2"
 	--
 	--movement
-	local spd=self.s
-	local i=self.p2i
-	local targets={
-		{92,16},{92,98},{3,98},
-		{3,16}
-	}
-	local tx,ty=unpack(targets[i])
-	local dx=mid(-spd,tx-self.x,spd)
-	local dy=mid(-spd,ty-self.y,spd)
-	self.dx=dx
-	if abs(self.x-tx)<0.5 and
-	   abs(self.y-ty)<0.5 then
-		self.x=tx
-		self.y=ty
-		self.p2i=(i%#targets)+1
-		if self.p2i==1 then
-			self.pht=frame()+30
-		end
-		return
+	local fr=frame()
+	local dx,dy=0,0
+	local v=self:path({
+		{92,16},{92,98},{3,98},{3,16}
+	})
+	if v then
+		dx,dy=unpack(v)
+	else
+		dx=1.5
+		self.pht=fr+30
 	end
+	self.dx=dx
 	self:move(dx,dy)
 	--shooting
-	if (frame()%15==0) red.fire(self)
+	if (fr%15==0) red.fire(self)
 	--transition
 	self:checkphasetrans(self.phase3)
 end
@@ -1375,8 +1369,30 @@ function boss:phase3()
 	self:checkphasetrans(self.phase4)
 end
 function boss:phase4()
-	--todo
+	--debug
 	self.ph="ph4"
+	--
+	--movement
+	local fr=frame()
+	local dx,dy=0,0
+	local v=self:path({
+		{3,16},{3,98},{92,98},{92,16}
+	})
+	if v then
+		dx,dy=unpack(v)
+	else
+		dx=1.5
+		self.pht=fr+30
+	end
+	self.dx=dx
+	self:move(dx,dy)
+	--shooting
+	if fr%10==0 then
+		--idk why dx inverted
+		local ang=atan2(-dx,dy)
+		self:fire(ang)
+	end
+	--transition
 	self:checkphasetrans(self.phase1)
 end
 function boss:checkphasetrans(nextphase)
@@ -1387,13 +1403,34 @@ function boss:checkphasetrans(nextphase)
 end
 function boss:pace(spd)
 	local spd=spd or self.s
-	local dx=sgn(self.dx)*spd
+	local dx=sgn(self.dx)*spd --if dx not set?!
 	if (not dx) dx=rnd({-spd,spd})
 	if (self.x<=3) dx=spd
 	if (self.x+self:w()>=124) dx=-spd
 	self:move(dx,0)
 	self.dx=dx
 end
+function boss:path(pnts,spd,loop)
+	local spd=spd or self.s
+	local loop=loop or false
+--	local nxt=true
+	local x,y=self.x,self.y
+	::getnavpoint::
+	local i=self.pi
+	local tx,ty=unpack(pnts[i])
+	if x==tx and y==ty then
+		self.pi=(i%#pnts)+1
+		if self.pi==1 and
+		   not loop then
+			return nil
+		end
+		goto getnavpoint
+	end
+	local dx=mid(-spd,tx-x,spd)
+	local dy=mid(-spd,ty-y,spd)
+	return {dx,dy}
+end
+
 -->8
 --pickups & waves
 
