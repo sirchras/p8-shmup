@@ -253,12 +253,11 @@ function update_game()
 	--move player
 	if (p.♥>0) p:update()
 	--move bullets
-	for i=#bullets,1,-1 do
-		local b=bullets[i]
+	for b in all(bullets) do
 		b:update()
 		--rm offscreen bullets
 		if b.y>128 or b.y<-8 then
-			deli(bullets,i)
+			del(bullets,b)
 		end
 	end
 	--move enemies
@@ -275,14 +274,14 @@ function update_game()
 	if #enemies>0 then
 		if fr>firenext then
 			local e=selectenemy()
-			if e and e.act==e.hold then
+			if e and not e.act then
 				e:fire()
 				firenext=fr+20+rnd(20)
 			end
 		end
 		if fr%atkfreq==0 then
 			local e=selectenemy()
-			if e and e.act==e.hold then
+			if e and not e.act then
 				e.wait=30
 				e.shke=30
 				e.act=e.atk
@@ -359,15 +358,29 @@ end
 
 --gmobj-enemy collisions
 function enemy_col(e)
-	e.♥-=1
+	--indicate hit - flash
 	e.flsh=4
 	if (e.typ=="boss") e.flsh=8
+	--return if invulnerable
+	if (e.invul) return
+	e.♥-=1 --update health
 	if e.♥<=0 then
+		--enemy dead
+		if e.typ=="boss" then
+			e.act=e.explode
+			e.pht=frame()+120 --4 sec
+			--when exploding boss should
+			-- not take dmg
+			e.invul=true
+			--clear enemy bullets
+			clearenemybullets()
+			return
+		end
 		--delete the dead enemy
 		del(enemies,e)
 		--create explosion fx
 		spawnexplosion(e.x+4,e.y+4,
-			"blue")
+			1,"blue")
 		local pup=0.15 --pkup chance
 		if e.act==e.atk then
 			--select new enemy to atk
@@ -390,6 +403,21 @@ function enemy_col(e)
 		--score,sfx feedback
 		sfx(2)
 		score+=10
+	end
+end
+
+function clearenemybullets()
+	for b in all(bullets) do
+		if b.__index==ebullet then
+			del(bullets,b)
+			add(pfx,skwv:new{
+				x=b.x,
+				y=b.y,
+				r=3,
+				mt=3,
+				c=14
+			})
+		end
 	end
 end
 
@@ -434,8 +462,9 @@ end
 do
 	local blnk=blink(8,6)
 	function displaywavetxt()
+		local str=(wave==#waves and "boss" or "wave")
 		print("warning",51,32,blnk())
-		print("wave incoming",39,40,
+		print(str.." incoming",39,40,
 			blnk())
 		print("wave "..wave,53,90,6)
 	end
@@ -455,6 +484,7 @@ function spawnenemies(row,i)
 		--perhaps vectors?
 		e.tx,e.ty=x,y+56
 		e.wait=abs(i-(#row/2)-0.5)*1.5
+		e.act=e.adv
 --		e.wait=(5-abs(i-(#row/2)-0.5))*3
 		::continue::
 	end
@@ -484,26 +514,28 @@ function selectenemy()
 	}
 	--filter out busy enemies
 	for e in all(tbl) do
-		if (e.act!=e.hold) del(tbl,e)
+--		if (e.act!=e.hold) del(tbl,e)
+		if (not not e.act) del(tbl,e)
 	end
 	if (#tbl>0) return rnd(tbl)
 	--select from behind vanguard
 	i-=1+flr(rnd(10))
 	if i>0 then
 		local e=enemies[i]
-		if (e.act==e.hold) return e
+		if (not e.act) return e
 	end
 	return nil
 end
 
 --spawn explosion pfx
-function spawnexplosion(x,y,c)
+function spawnexplosion(x,y,s,c)
 	local c=c or "red"
+	local s=s or 1
 	--central flash ptc
 	add(pfx,expl:new{
 		x=x,
 		y=y,
-		r=8,
+		r=8*s,
 		mt=0,
 		explc=c
 	})
@@ -512,9 +544,9 @@ function spawnexplosion(x,y,c)
 		add(pfx,expl:new{
 			x=x,
 			y=y,
-			r=1+rnd(4), -- 1<=r<5
-			dx=rnd(6)-3, -- -3<=dx<3
-			dy=rnd(6)-3, -- -3<=dy<3
+			r=(1+rnd(4))*s, -- 1<=r<5
+			dx=(rnd(6)-3)*s, -- -3<=dx<3
+			dy=(rnd(6)-3)*s, -- -3<=dy<3
 			mt=10+rnd(10), -- 10<=mt<20
 			explc=c
 		})
@@ -523,8 +555,8 @@ function spawnexplosion(x,y,c)
 	add(pfx,skwv:new{
 		x=x,
 		y=y,
-		r=9,
-		dr=2,
+		r=9*s,
+		dr=2*s,
 		mt=6,
 	})
 	--sparks
@@ -532,8 +564,8 @@ function spawnexplosion(x,y,c)
 		add(pfx,sprk:new{
 			x=x,
 			y=y,
-			dx=rnd(10)-5, -- -5<=dx<5
-			dy=rnd(10)-5, -- -5<=dy<5
+			dx=(rnd(10)-5)*s, -- -5<=dx<5
+			dy=(rnd(10)-5)*s, -- -5<=dy<5
 			mt=10+rnd(10), -- 10<=mt<20
 		})
 	end
@@ -825,6 +857,11 @@ function player:update()
 	if btnp(❎) then
 		self:fire()
 	end
+	--debug
+--	if btnp(🅾️) then
+--		spawnexplosion(self.x,self.y,2)
+--	end
+	--
 	--move/update player
 	self:move(dx,dy)
 	self.x=mid(0,self.x,120)
@@ -1031,6 +1068,7 @@ enemy=gmobj:new{
 	tx=0, --target x position
 	ty=0, --target y position
 	wait=0, --wait before active
+	invul=true, --true while adv
 	shke=0, --shake
 	s=1, --default mv speed
 	fsfx=29, --fire sfx
@@ -1047,15 +1085,8 @@ function enemy:update()
 	--anim
 	self:anim()
 	--enemy state - action
-	if (not self.act) self.act=self.adv
-	self:act()
-	--debug
---	if self.typ=="boss" then
---		if (frame()%5==0) self:act()
---	else
---		self:act()
---	end
-	--
+--	if (not self.act) self.act=self.adv
+	if (self.act) self:act()
 	--check enemy/player collision
 	if self:col(p) and
 	   p.invul==0 then
@@ -1110,7 +1141,9 @@ function enemy:adv()
 	if abs(self.y-self.ty)<0.5 then
 		self.y=self.ty
 		self.x=self.tx
-		self.act=self.hold
+		self.invul=false
+--		self.act=self.hold
+		self.act=nil
 		return
 	end
 	self:move(dx,dy)
@@ -1271,7 +1304,8 @@ boss=enemy:new{
 	fr={196,200,204,200}, --anim frames
 	fr_i=1, --current anim frame
 	fr_s=0.4, --anim speed
-	♥=20, --enemy health
+--	♥=20,
+	♥=150, --enemy health
 	spx=4, --sprite width
 	spy=3, --sprite height
 	typ="boss", --type
@@ -1280,21 +1314,7 @@ boss=enemy:new{
 	pi=1, --path index
 	anginc=1/24,
 	fsfx=34, --fire sfx
-	--debug
-	ph=nil,
-	ddx=0,
-	ddy=0,
 }
-function boss:draw()
-	enemy.draw(self)
-	--debug
-	print(self.tx..", "..self.ty,0,8,8)
-	print(self.x..", "..self.y,0,14,8)
-	print(self.ddx..", "..self.ddy,0,20,8)
-	print(self.ph,self.x,self.y+self:h()+7,11)
-	print(self.dx,self.x,self.y+self:h(),2)
-	--
-end
 function boss:flash()
 	self.sp=192
 	if frame()%4<2 then
@@ -1308,20 +1328,14 @@ function boss:adv()
 	if abs(self.y-self.ty)<0.5 then
 		self.y=self.ty
 		self.x=self.tx
+		self.invul=false
 		self.act=self.phase1
---		self.act=self.phase2
---		self.act=self.phase3
---		self.act=self.phase4
 		self.pht=frame()+240 --8 sec
---		self.pht=frame()+1800
 		return
 	end
 	self:move(dx,dy)
 end
 function boss:phase1()
-	--debug
-	self.ph="ph1"
-	--
 	--movement
 	self:pace()
 	--shooting
@@ -1334,9 +1348,6 @@ function boss:phase1()
 	self:checkphasetrans(self.phase2)
 end
 function boss:phase2()
-	--debug
-	self.ph="ph2"
-	--
 	--movement
 	local fr=frame()
 	local dx,dy=0,0
@@ -1357,9 +1368,6 @@ function boss:phase2()
 	self:checkphasetrans(self.phase3)
 end
 function boss:phase3()
-	--debug
-	self.ph="ph3"
-	--
 	--movement
 	self:pace(0.5)
 	--shooting
@@ -1369,9 +1377,6 @@ function boss:phase3()
 	self:checkphasetrans(self.phase4)
 end
 function boss:phase4()
-	--debug
-	self.ph="ph4"
-	--
 	--movement
 	local fr=frame()
 	local dx,dy=0,0
@@ -1381,13 +1386,14 @@ function boss:phase4()
 	if v then
 		dx,dy=unpack(v)
 	else
-		dx=1.5
+		--right or left?
+		dx=-1.5
 		self.pht=fr+30
 	end
 	self.dx=dx
 	self:move(dx,dy)
 	--shooting
-	if fr%10==0 then
+	if fr%12==0 then
 		--idk why dx inverted
 		local ang=atan2(-dx,dy)
 		self:fire(ang)
@@ -1395,12 +1401,42 @@ function boss:phase4()
 	--transition
 	self:checkphasetrans(self.phase1)
 end
+--death throes
+function boss:explode()
+	local fr=frame()
+	self.flsh=5
+	self.shke=5
+	if fr%8==0 then
+		spawnexplosion(self.x+rnd(32),
+			self.y+rnd(24),1,"blue")
+		shake=2 --scrn shake
+		sfx(2) --enemy expl sfx
+	end
+	--additional expl in last 2 sec
+	if fr>self.pht-60 and
+	   fr%5==0 then
+		spawnexplosion(self.x+rnd(32),
+			self.y+rnd(24),1,"blue")
+		shake=2 --scrn shake
+		sfx(2) --enemy expl sfx
+	end
+	--del after 4 sec
+	if fr>self.pht then
+		spawnexplosion(self.x+16,
+			self.y+12,3,"blue")
+		shake=15
+		del(enemies,self)
+		sfx(35)
+	end
+end
+--transition between phases
 function boss:checkphasetrans(nextphase)
 	if frame()>self.pht then
 		self.act=nextphase
 		self.pht=frame()+240 --8 sec
 	end
 end
+--move horizontally left/right
 function boss:pace(spd)
 	local spd=spd or self.s
 	local dx=sgn(self.dx)*spd --if dx not set?!
@@ -1410,6 +1446,7 @@ function boss:pace(spd)
 	self:move(dx,0)
 	self.dx=dx
 end
+--move to each point on a path
 function boss:path(pnts,spd,loop)
 	local spd=spd or self.s
 	local loop=loop or false
@@ -1491,14 +1528,14 @@ function init_waves()
 	--4: red
 	--5: yellow/bb
 	return {
-		{
-			--0: testing
-			{0,0,0,6,0,0,0,0,0,0},
-			{0,0,0,0,0,0,0,0,0,0},
-			{0,0,0,0,0,0,0,0,0,0},
-			{0,0,0,0,0,0,0,0,0,0},
-			atkfreq=1800
-		},
+--		{
+--			--0: testing
+--			{0,0,0,6,0,0,0,0,0,0},
+--			{0,0,0,0,0,0,0,0,0,0},
+--			{0,0,0,0,0,0,0,0,0,0},
+--			{0,0,0,0,0,0,0,0,0,0},
+--			atkfreq=1800
+--		},
 		{
 			--1: "space invaders"
 			{0,1,1,1,1,1,1,1,1,0},
@@ -1746,6 +1783,7 @@ __sfx__
 000400000744007420074200a40000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
 4a0200002c6412f66130661316613766132661326612b6612866125671226611e661146611a651166510864111641056410c64105641046410264102631026310163101621006210062100611006110061100611
 000100000914008150081600f160121400f1400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+120400003c6733c6433d6733d6233d6533d6733d6733c6733b6733765336653336532f6532d6532b653286532665323643216431f6431d643196431564312633116330f6230c6230a62308623056230362300623
 __music__
 04 04050644
 00 07084749
