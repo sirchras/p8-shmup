@@ -48,36 +48,13 @@ do
 		}
 		if (shake>0) scrnshake()
 		draw[state]()
-		--debug layout/ui
---		local x=6
---		for i=1,10 do
---			line(x,0,x,127,8)
---			line(x+8,0,x+8,127,9)
---			x+=12
---		end
---		line(0,0,0,127,5)
---		line(64,0,64,127,5)
---		line(127,0,127,127,5)
-		line(3,0,3,127,9)
-		line(124,0,124,127,9)
---		print("❎",0,0,2) --7x5 px
---		print("ww",0,6,2) --7x5 px
---		print("♥",0,12,2) --7x5 px
 		--debug time
-		print(flr(time()),0,120,7)
-		print(flr(time()*30),16,120,7)
+--		print(flr(time()),0,120,7)
+--		print(flr(time()*30),16,120,7)
 		--debug game objs and fx
-		if (bullets) print(#bullets,0,112,8)
-		if (enemies) print(#enemies,0,104,11)
-		if (pfx) print(#pfx,0,96,9)
-		--debug waves
---		if (wvt) print(wvt,120,104,11)
-		--debug state/transitions
---		print(state,0,80,12)
---		print(target_state,0,88,12)
---		if (target_state) print(tt,20,88,12)
-		--debug music playing
---		print(stat(57),30,120,13)
+--		if (bullets) print(#bullets,0,112,8)
+--		if (enemies) print(#enemies,0,104,11)
+--		if (pfx) print(#pfx,0,96,9)
 	end
 
 	function setstate(target,delay)
