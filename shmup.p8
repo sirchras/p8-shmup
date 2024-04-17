@@ -16,9 +16,6 @@ do
 		startscrn()
 --		setbtnpdelay()
 		shake=0
-		--debug
---		debug=true
---		frame=0
 	end
 
 	function _update()
@@ -36,8 +33,6 @@ do
 			end
 		end
 		update[state]()
-		--debug
---		frame+=1
 	end
 
 	function _draw()
@@ -160,7 +155,6 @@ do
 		end
 		if btnp(❎) then
 			--start game
-	--		startgame()
 			startscrn()
 		end
 	end
@@ -491,7 +485,6 @@ function selectenemy()
 	}
 	--filter out busy enemies
 	for e in all(tbl) do
---		if (e.act!=e.hold) del(tbl,e)
 		if (not not e.act) del(tbl,e)
 	end
 	if (#tbl>0) return rnd(tbl)
@@ -834,11 +827,6 @@ function player:update()
 	if btnp(❎) then
 		self:fire()
 	end
-	--debug
---	if btnp(🅾️) then
---		spawnexplosion(self.x,self.y,2)
---	end
-	--
 	--move/update player
 	self:move(dx,dy)
 	self.x=mid(0,self.x,120)
@@ -1002,10 +990,8 @@ function firearc2(self,typ,n,ang,spd)
 	local ang=ang or 0.5
 	local spd=spd or 2
 	local inc=0.25/(n+1)
---	ang-=(0.125-inc)
 	ang-=0.125
 	for i=1,n do
---		fire(self,typ,ang+(i-1)*inc,spd)
 		fire(self,typ,ang+i*inc,spd)
 	end
 end
@@ -1062,7 +1048,6 @@ function enemy:update()
 	--anim
 	self:anim()
 	--enemy state - action
---	if (not self.act) self.act=self.adv
 	if (self.act) self:act()
 	--check enemy/player collision
 	if self:col(p) and
@@ -1088,15 +1073,6 @@ function enemy:draw()
 	--call parent draw fn
 	gmobj.draw(obj)
 	pal() --reset palette
-	--debug
---	print(self.y,self.x,self.y+8,8)
---	if (self.wait) print(self.wait,self.x,self.y+8,8)
---	local atk=(self.act==self.atk)
---	local adv=(self.act==self.adv)
---	local hold=(self.act==self.hold)
---	print(hold and "y" or "n",self.x,self.y+8,8)
---	if (self.frame) print(self.frame,self.x,self.y+8,8)
---	if (self.act==self.atk) print(self.dx,self.x,self.y+8,8)
 end
 function enemy:flash()
 	--flash white on dmg
@@ -1119,14 +1095,10 @@ function enemy:adv()
 		self.y=self.ty
 		self.x=self.tx
 		self.invul=false
---		self.act=self.hold
 		self.act=nil
 		return
 	end
 	self:move(dx,dy)
-end
-function enemy:hold()
-	--replace this with nil?
 end
 function enemy:atk()
 	--attack
@@ -1150,7 +1122,6 @@ function green:atk()
 		dx=sgn(d)*min(abs(d),20)/30
 	end
 	dx+=sin(time()*30/20)
---	dx+=sin(flr(time()*30)%30/30)
 	local dy=1
 	self:move(dx,dy)
 	self.x=mid(0,self.x,120)
@@ -1218,7 +1189,6 @@ function jelly:atk()
 		end
 	end
 	self:move(dx,dy)
---	enemy.atk(self)
 end
 
 --red
@@ -1281,7 +1251,6 @@ boss=enemy:new{
 	fr={196,200,204,200}, --anim frames
 	fr_i=1, --current anim frame
 	fr_s=0.4, --anim speed
---	♥=20,
 	♥=150, --enemy health
 	spx=4, --sprite width
 	spy=3, --sprite height
@@ -1427,7 +1396,6 @@ end
 function boss:path(pnts,spd,loop)
 	local spd=spd or self.s
 	local loop=loop or false
---	local nxt=true
 	local x,y=self.x,self.y
 	::getnavpoint::
 	local i=self.pi
@@ -1474,7 +1442,7 @@ end
 function pickup:collect()
 	coins+=1
 	if coins>=10 then
-		--upgrade weapon?
+		--upgrade weapon
 		p:upgrade()
 		coins-=10
 	end
